@@ -1,0 +1,16 @@
+[project]
+name = "uthana-api"
+version = "0.1.0"
+description = "Python wrapper around Uthana's HTTP API"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
