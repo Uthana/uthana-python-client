@@ -25,6 +25,7 @@ class MotionOutput:
 class CharacterOutput:
     url: str
     character_id: str
+    auto_rig_confidence: float | None = None
     session: requests.Session | None = None
 
     def read(self) -> bytes:

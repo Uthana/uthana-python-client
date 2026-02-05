@@ -30,6 +30,7 @@ def test_auto_rig_v1():
 
     assert output.character_id
     assert output.url
+    assert output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     output.save(str(ARTIFACTS_DIR / "icegoblin_rigged.glb"))
