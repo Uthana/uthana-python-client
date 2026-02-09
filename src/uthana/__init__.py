@@ -1,4 +1,4 @@
-from .client import Client, CharacterOutput, MotionOutput
+from .client import DefaultCharacters, Client, CharacterOutput, MotionOutput
 from .exceptions import Error, APIError
 
-__all__ = ["Client", "Error", "APIError", "CharacterOutput", "MotionOutput"]
+__all__ = ["DefaultCharacters", "Client", "Error", "APIError", "CharacterOutput", "MotionOutput"]

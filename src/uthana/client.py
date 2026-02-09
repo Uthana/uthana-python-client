@@ -10,7 +10,8 @@ from .exceptions import APIError
 
 @dataclass
 class MotionOutput:
-    url: str
+    character_id: str
+    motion_id: str
 
 
 @dataclass
@@ -33,18 +34,18 @@ def detect_mesh_format(filepath: str) -> str | None:
     return None
 
 
-Character = Literal["Tar", "Ava", "Manny", "Quinn", "Y Bot"]
 OutputFormat = Literal["GLB", "FBX"]
 
-CHARACTER_IDS = {
-    "Tar": "cXi2eAP19XwQ",
-    "Ava": "cmEE2fT4aSaC",
-    "Manny": "c43tbGks3crJ",
-    "Quinn": "czCjWEMtWxt8",
-    "Y Bot": "cJM4ngRqXg83",
-}
+@dataclass(frozen=True)
+class DefaultCharacters:
+    tar: str = "cXi2eAP19XwQ"
+    ava: str = "cmEE2fT4aSaC"
+    manny: str = "c43tbGks3crJ"
+    quinn: str = "czCjWEMtWxt8"
+    y_bot: str = "cJM4ngRqXg83"
 
-DEFAULT_CHARACTER: Character = "Tar"
+
+DEFAULT_CHARACTER_ID = DefaultCharacters.tar
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "GLB"
 DEFAULT_FPS = 30
 DEFAULT_NO_MESH = True
@@ -143,29 +144,26 @@ class Client:
         return result["data"]
 
     @staticmethod
-    def _prepare_text_to_motion_v1(prompt: str, character: Character, foot_ik: bool) -> tuple[dict, str]:
-        character_id = CHARACTER_IDS[character]
-        variables = {
+    def _prepare_text_to_motion_v1(prompt: str, character_id: str, foot_ik: bool) -> dict:
+        return {
             "prompt": prompt,
             "character_id": character_id,
             "model": "text-to-motion",
             "foot_ik": foot_ik,
         }
-        return variables, character_id
 
     @staticmethod
     def _prepare_text_to_motion_v2(
         prompt: str,
-        character: Character,
+        character_id: str,
         foot_ik: bool,
         cfg_scale: float,
         motion_length: float,
         seed: int,
         internal_ik: bool,
-    ) -> tuple[dict, str]:
-        character_id = CHARACTER_IDS[character]
+    ) -> dict:
         motion_length_fps = 20
-        variables = {
+        return {
             "prompt": prompt,
             "character_id": character_id,
             "model": "text-to-motion-bucmd",
@@ -175,7 +173,6 @@ class Client:
             "seed": None if seed == 0 else seed,
             "retargeting_ik": internal_ik,
         }
-        return variables, character_id
 
     def _motion_url(
         self, character_id: str, motion_id: str, output_format: OutputFormat, fps: int, no_mesh: bool
@@ -226,51 +223,40 @@ class Client:
         self,
         prompt: str,
         *,
-        character: Character = DEFAULT_CHARACTER,
-        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
     ) -> MotionOutput:
-        variables, character_id = self._prepare_text_to_motion_v1(prompt, character, foot_ik)
+        variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
         data = self._graphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
-        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url)
+        return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     async def acreate_text_to_motion_v1(
         self,
         prompt: str,
         *,
-        character: Character = DEFAULT_CHARACTER,
-        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
     ) -> MotionOutput:
-        variables, character_id = self._prepare_text_to_motion_v1(prompt, character, foot_ik)
+        variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
         data = await self._agraphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
-        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url)
+        return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     def create_text_to_motion_v2(
         self,
         prompt: str,
         *,
-        character: Character = DEFAULT_CHARACTER,
-        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
         motion_length: float = DEFAULT_MOTION_LENGTH,
         cfg_scale: float = DEFAULT_CFG_SCALE,
         seed: int = DEFAULT_SEED,
         internal_ik: bool = DEFAULT_INTERNAL_IK,
     ) -> MotionOutput:
-        variables, character_id = self._prepare_text_to_motion_v2(
+        variables = self._prepare_text_to_motion_v2(
             prompt,
-            character,
+            character_id,
             foot_ik,
             cfg_scale,
             motion_length,
@@ -279,26 +265,22 @@ class Client:
         )
         data = self._graphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
-        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url)
+        return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     async def acreate_text_to_motion_v2(
         self,
         prompt: str,
         *,
-        character: Character = DEFAULT_CHARACTER,
-        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
         motion_length: float = DEFAULT_MOTION_LENGTH,
         cfg_scale: float = DEFAULT_CFG_SCALE,
         seed: int = DEFAULT_SEED,
         internal_ik: bool = DEFAULT_INTERNAL_IK,
     ) -> MotionOutput:
-        variables, character_id = self._prepare_text_to_motion_v2(
+        variables = self._prepare_text_to_motion_v2(
             prompt,
-            character,
+            character_id,
             foot_ik,
             cfg_scale,
             motion_length,
@@ -307,8 +289,7 @@ class Client:
         )
         data = await self._agraphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
-        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url)
+        return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     def create_character(
         self,

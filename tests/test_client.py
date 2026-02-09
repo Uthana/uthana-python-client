@@ -26,17 +26,27 @@ def test_client_staging():
 @requires_api_key
 def test_create_text_to_motion_v1_glb():
     client = Client(API_KEY, staging=True)
-    output = client.create_text_to_motion_v1("a person walking forward", output_format="GLB", fps=30)
+    output = client.create_text_to_motion_v1("a person walking forward")
 
-    assert output.url
+    assert output.character_id
+    assert output.motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = client.download_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    (ARTIFACTS_DIR / "walking_forward_30.glb").write_bytes(data)
 
 
 @requires_api_key
 def test_create_text_to_motion_v1_fbx():
     client = Client(API_KEY, staging=True)
-    output = client.create_text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
+    output = client.create_text_to_motion_v1("a person walking forward")
 
-    assert output.url
+    assert output.character_id
+    assert output.motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = client.download_motion(output.character_id, output.motion_id, output_format="FBX", fps=60)
+    (ARTIFACTS_DIR / "walking_forward_60.fbx").write_bytes(data)
 
 
 @requires_api_key
@@ -74,27 +84,42 @@ def test_create_character_fbx():
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_v1_glb():
     client = Client(API_KEY, staging=True)
-    output = await client.acreate_text_to_motion_v1("a person walking forward", output_format="GLB", fps=30)
+    output = await client.acreate_text_to_motion_v1("a person walking forward")
 
-    assert output.url
+    assert output.character_id
+    assert output.motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    (ARTIFACTS_DIR / "async_walking_forward_30.glb").write_bytes(data)
 
 
 @requires_api_key
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_v1_fbx():
     client = Client(API_KEY, staging=True)
-    output = await client.acreate_text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
+    output = await client.acreate_text_to_motion_v1("a person walking forward")
 
-    assert output.url
+    assert output.character_id
+    assert output.motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="FBX", fps=60)
+    (ARTIFACTS_DIR / "async_walking_forward_60.fbx").write_bytes(data)
 
 
 @requires_api_key
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_v2_glb():
     client = Client(API_KEY, staging=True)
-    output = await client.acreate_text_to_motion_v2("a person dancing", output_format="GLB", fps=30)
+    output = await client.acreate_text_to_motion_v2("a person dancing")
 
-    assert output.url
+    assert output.character_id
+    assert output.motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    (ARTIFACTS_DIR / "async_dancing_30.glb").write_bytes(data)
 
 
 @requires_api_key
