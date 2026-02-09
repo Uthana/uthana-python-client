@@ -1,11 +1,23 @@
 import json
 import os
+from dataclasses import dataclass
 from typing import Literal
 
 import httpx
 
 from .exceptions import APIError
-from .models import CharacterOutput, MotionOutput
+
+
+@dataclass
+class MotionOutput:
+    url: str
+
+
+@dataclass
+class CharacterOutput:
+    url: str
+    character_id: str
+    auto_rig_confidence: float | None = None
 
 
 def detect_mesh_format(filepath: str) -> str | None:
@@ -34,7 +46,7 @@ CHARACTER_IDS = {
 
 DEFAULT_CHARACTER: Character = "Tar"
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "GLB"
-DEFAULT_FPS = 24
+DEFAULT_FPS = 30
 DEFAULT_NO_MESH = True
 DEFAULT_FOOT_IK = True
 DEFAULT_MOTION_LENGTH = 1.0
@@ -200,7 +212,6 @@ class Client:
             url=url,
             character_id=character_id,
             auto_rig_confidence=auto_rig_confidence,
-            session=self.session,
         )
 
     def _check_response(self, response: httpx.Response) -> dict:
@@ -225,7 +236,7 @@ class Client:
         data = self._graphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url, session=self.session)
+        return MotionOutput(url=url)
 
     async def acreate_text_to_motion_v1(
         self,
@@ -241,7 +252,7 @@ class Client:
         data = await self._agraphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url, session=self.session)
+        return MotionOutput(url=url)
 
     def create_text_to_motion_v2(
         self,
@@ -269,7 +280,7 @@ class Client:
         data = self._graphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url, session=self.session)
+        return MotionOutput(url=url)
 
     async def acreate_text_to_motion_v2(
         self,
@@ -297,7 +308,7 @@ class Client:
         data = await self._agraphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
-        return MotionOutput(url=url, session=self.session)
+        return MotionOutput(url=url)
 
     def create_character(
         self,
@@ -338,3 +349,59 @@ class Client:
 
         result = self._check_response(response)
         return self._build_character_output(result, ext)
+
+    def download_character(
+        self,
+        character_id: str,
+        *,
+        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+    ) -> bytes:
+        ext = output_format.lower()
+        url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
+        response = self.session.get(url)
+        if not response.is_success:
+            raise APIError(response.status_code, response.text)
+        return response.content
+
+    async def adownload_character(
+        self,
+        character_id: str,
+        *,
+        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+    ) -> bytes:
+        ext = output_format.lower()
+        url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
+        response = await self.async_client.get(url)
+        if not response.is_success:
+            raise APIError(response.status_code, response.text)
+        return response.content
+
+    def download_motion(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+        fps: int = DEFAULT_FPS,
+        no_mesh: bool = DEFAULT_NO_MESH,
+    ) -> bytes:
+        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
+        response = self.session.get(url)
+        if not response.is_success:
+            raise APIError(response.status_code, response.text)
+        return response.content
+
+    async def adownload_motion(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+        fps: int = DEFAULT_FPS,
+        no_mesh: bool = DEFAULT_NO_MESH,
+    ) -> bytes:
+        url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
+        response = await self.async_client.get(url)
+        if not response.is_success:
+            raise APIError(response.status_code, response.text)
+        return response.content

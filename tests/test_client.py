@@ -30,9 +30,6 @@ def test_create_text_to_motion_v1_glb():
 
     assert output.url
 
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "walking_forward_30.glb"))
-
 
 @requires_api_key
 def test_create_text_to_motion_v1_fbx():
@@ -40,9 +37,6 @@ def test_create_text_to_motion_v1_fbx():
     output = client.create_text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
 
     assert output.url
-
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "walking_forward_60.fbx"))
 
 
 @requires_api_key
@@ -55,7 +49,8 @@ def test_create_character_glb():
     assert output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "icegoblin_rigged.glb"))
+    data = client.download_character(output.character_id, output_format="GLB")
+    (ARTIFACTS_DIR / "icegoblin_rigged.glb").write_bytes(data)
 
 
 @requires_api_key
@@ -68,7 +63,8 @@ def test_create_character_fbx():
     assert output.auto_rig_confidence >= 0.7
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "wrestler_rigged.fbx"))
+    data = client.download_character(output.character_id, output_format="FBX")
+    (ARTIFACTS_DIR / "wrestler_rigged.fbx").write_bytes(data)
 
 
 # Async tests
@@ -82,9 +78,6 @@ async def test_acreate_text_to_motion_v1_glb():
 
     assert output.url
 
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "async_walking_forward_30.glb"))
-
 
 @requires_api_key
 @pytest.mark.asyncio
@@ -94,9 +87,6 @@ async def test_acreate_text_to_motion_v1_fbx():
 
     assert output.url
 
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "async_walking_forward_60.fbx"))
-
 
 @requires_api_key
 @pytest.mark.asyncio
@@ -105,9 +95,6 @@ async def test_acreate_text_to_motion_v2_glb():
     output = await client.acreate_text_to_motion_v2("a person dancing", output_format="GLB", fps=30)
 
     assert output.url
-
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "async_dancing_30.glb"))
 
 
 @requires_api_key
@@ -121,7 +108,8 @@ async def test_acreate_character_glb():
     assert output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "async_icegoblin_rigged.glb"))
+    data = await client.adownload_character(output.character_id, output_format="GLB")
+    (ARTIFACTS_DIR / "async_icegoblin_rigged.glb").write_bytes(data)
 
 
 @requires_api_key
@@ -135,4 +123,5 @@ async def test_acreate_character_fbx():
     assert output.auto_rig_confidence >= 0.7
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    output.save(str(ARTIFACTS_DIR / "async_wrestler_rigged.fbx"))
+    data = await client.adownload_character(output.character_id, output_format="FBX")
+    (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)
