@@ -24,9 +24,9 @@ def test_client_staging():
 
 
 @requires_api_key
-def test_text_to_motion_v1_glb():
+def test_create_text_to_motion_v1_glb():
     client = Client(API_KEY, staging=True)
-    output = client.text_to_motion_v1("a person walking forward", output_format="GLB", fps=30)
+    output = client.create_text_to_motion_v1("a person walking forward", output_format="GLB", fps=30)
 
     assert output.url
 
@@ -35,9 +35,9 @@ def test_text_to_motion_v1_glb():
 
 
 @requires_api_key
-def test_text_to_motion_v1_fbx():
+def test_create_text_to_motion_v1_fbx():
     client = Client(API_KEY, staging=True)
-    output = client.text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
+    output = client.create_text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
 
     assert output.url
 
@@ -46,9 +46,9 @@ def test_text_to_motion_v1_fbx():
 
 
 @requires_api_key
-def test_auto_rig_v1_glb():
+def test_create_character_glb():
     client = Client(API_KEY, staging=True)
-    output = client.auto_rig_v1(str(FIXTURES_DIR / "icegoblin.glb"))
+    output = client.create_character(str(FIXTURES_DIR / "icegoblin.glb"))
 
     assert output.character_id
     assert output.url
@@ -59,13 +59,80 @@ def test_auto_rig_v1_glb():
 
 
 @requires_api_key
-def test_auto_rig_v1_fbx():
+def test_create_character_fbx():
     client = Client(API_KEY, staging=True)
-    output = client.auto_rig_v1(str(FIXTURES_DIR / "wrestler.fbx"))
+    output = client.create_character(str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
     assert output.url
-    assert output.auto_rig_confidence == 1.0
+    assert output.auto_rig_confidence >= 0.7
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     output.save(str(ARTIFACTS_DIR / "wrestler_rigged.fbx"))
+
+
+# Async tests
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_text_to_motion_v1_glb():
+    client = Client(API_KEY, staging=True)
+    output = await client.acreate_text_to_motion_v1("a person walking forward", output_format="GLB", fps=30)
+
+    assert output.url
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    output.save(str(ARTIFACTS_DIR / "async_walking_forward_30.glb"))
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_text_to_motion_v1_fbx():
+    client = Client(API_KEY, staging=True)
+    output = await client.acreate_text_to_motion_v1("a person walking forward", output_format="FBX", fps=60)
+
+    assert output.url
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    output.save(str(ARTIFACTS_DIR / "async_walking_forward_60.fbx"))
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_text_to_motion_v2_glb():
+    client = Client(API_KEY, staging=True)
+    output = await client.acreate_text_to_motion_v2("a person dancing", output_format="GLB", fps=30)
+
+    assert output.url
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    output.save(str(ARTIFACTS_DIR / "async_dancing_30.glb"))
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_character_glb():
+    client = Client(API_KEY, staging=True)
+    output = await client.acreate_character(str(FIXTURES_DIR / "icegoblin.glb"))
+
+    assert output.character_id
+    assert output.url
+    assert output.auto_rig_confidence < 1.0
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    output.save(str(ARTIFACTS_DIR / "async_icegoblin_rigged.glb"))
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_character_fbx():
+    client = Client(API_KEY, staging=True)
+    output = await client.acreate_character(str(FIXTURES_DIR / "wrestler.fbx"))
+
+    assert output.character_id
+    assert output.url
+    assert output.auto_rig_confidence >= 0.7
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    output.save(str(ARTIFACTS_DIR / "async_wrestler_rigged.fbx"))

@@ -5,7 +5,7 @@ description = "Python wrapper around Uthana's HTTP API"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "requests",
+    "httpx",
 ]
 
 [build-system]
@@ -21,4 +21,5 @@ default-groups = ["dev"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.0.0",
 ]
