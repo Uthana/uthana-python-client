@@ -32,7 +32,7 @@ def test_create_text_to_motion_v1_glb():
     assert output.motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = client.download_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    data = client.download_motion(output.character_id, output.motion_id, output_format="glb", fps=30)
     (ARTIFACTS_DIR / "walking_forward_30.glb").write_bytes(data)
 
 
@@ -45,7 +45,7 @@ def test_create_text_to_motion_v1_fbx():
     assert output.motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = client.download_motion(output.character_id, output.motion_id, output_format="FBX", fps=60)
+    data = client.download_motion(output.character_id, output.motion_id, output_format="fbx", fps=60)
     (ARTIFACTS_DIR / "walking_forward_60.fbx").write_bytes(data)
 
 
@@ -59,7 +59,7 @@ def test_create_character_glb():
     assert output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = client.download_character(output.character_id, output_format="GLB")
+    data = client.download_character(output.character_id, output_format="glb")
     (ARTIFACTS_DIR / "icegoblin_rigged.glb").write_bytes(data)
 
 
@@ -73,7 +73,7 @@ def test_create_character_fbx():
     assert output.auto_rig_confidence >= 0.7
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = client.download_character(output.character_id, output_format="FBX")
+    data = client.download_character(output.character_id, output_format="fbx")
     (ARTIFACTS_DIR / "wrestler_rigged.fbx").write_bytes(data)
 
 
@@ -90,7 +90,7 @@ async def test_acreate_text_to_motion_v1_glb():
     assert output.motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="glb", fps=30)
     (ARTIFACTS_DIR / "async_walking_forward_30.glb").write_bytes(data)
 
 
@@ -104,7 +104,7 @@ async def test_acreate_text_to_motion_v1_fbx():
     assert output.motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="FBX", fps=60)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="fbx", fps=60)
     (ARTIFACTS_DIR / "async_walking_forward_60.fbx").write_bytes(data)
 
 
@@ -118,7 +118,7 @@ async def test_acreate_text_to_motion_v2_glb():
     assert output.motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="GLB", fps=30)
+    data = await client.adownload_motion(output.character_id, output.motion_id, output_format="glb", fps=30)
     (ARTIFACTS_DIR / "async_dancing_30.glb").write_bytes(data)
 
 
@@ -133,7 +133,7 @@ async def test_acreate_character_glb():
     assert output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = await client.adownload_character(output.character_id, output_format="GLB")
+    data = await client.adownload_character(output.character_id, output_format="glb")
     (ARTIFACTS_DIR / "async_icegoblin_rigged.glb").write_bytes(data)
 
 
@@ -148,5 +148,5 @@ async def test_acreate_character_fbx():
     assert output.auto_rig_confidence >= 0.7
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = await client.adownload_character(output.character_id, output_format="FBX")
+    data = await client.adownload_character(output.character_id, output_format="fbx")
     (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)

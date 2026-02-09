@@ -34,7 +34,7 @@ def detect_mesh_format(filepath: str) -> str | None:
     return None
 
 
-OutputFormat = Literal["GLB", "FBX"]
+OutputFormat = Literal["glb", "fbx"]
 
 @dataclass(frozen=True)
 class DefaultCharacters:
@@ -46,7 +46,7 @@ class DefaultCharacters:
 
 
 DEFAULT_CHARACTER_ID = DefaultCharacters.tar
-DEFAULT_OUTPUT_FORMAT: OutputFormat = "GLB"
+DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
 DEFAULT_FPS = 30
 DEFAULT_NO_MESH = True
 DEFAULT_FOOT_IK = True
