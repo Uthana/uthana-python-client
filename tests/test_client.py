@@ -154,7 +154,7 @@ async def test_acreate_character_fbx():
     (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)
 
 
-def _poll_job(client: Client, job_id: str, timeout: float = 600.0, interval: float = 2.0):
+def _poll_job(client: Client, job_id: str, timeout: float = 900.0, interval: float = 2.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         job = client.get_job(job_id)
@@ -164,7 +164,7 @@ def _poll_job(client: Client, job_id: str, timeout: float = 600.0, interval: flo
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
 
 
-async def _apoll_job(client: Client, job_id: str, timeout: float = 600.0, interval: float = 2.0):
+async def _apoll_job(client: Client, job_id: str, timeout: float = 900.0, interval: float = 2.0):
     import asyncio
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
