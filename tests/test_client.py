@@ -1,9 +1,11 @@
 import os
+import time
 from pathlib import Path
 
 import pytest
 
 from uthana import Client
+from uthana.client import DEFAULT_CHARACTER_ID
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
@@ -150,3 +152,67 @@ async def test_acreate_character_fbx():
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = await client.adownload_character(output.character_id, output_format="fbx")
     (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)
+
+
+def _poll_job(client: Client, job_id: str, timeout: float = 600.0, interval: float = 2.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        job = client.get_job(job_id)
+        if job.status in ("FINISHED", "FAILED"):
+            return job
+        time.sleep(interval)
+    raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
+
+
+async def _apoll_job(client: Client, job_id: str, timeout: float = 600.0, interval: float = 2.0):
+    import asyncio
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        job = await client.aget_job(job_id)
+        if job.status in ("FINISHED", "FAILED"):
+            return job
+        await asyncio.sleep(interval)
+    raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
+
+
+@requires_api_key
+def test_create_video_to_motion():
+    client = Client(API_KEY, staging=True)
+    job_output = client.create_video_to_motion(str(FIXTURES_DIR / "dance.mp4"))
+
+    assert job_output.job_id
+    assert job_output.status
+
+    job_output = _poll_job(client, job_output.job_id)
+    assert job_output.status == "FINISHED"
+
+    motion_id = job_output.result["motion"]["id"]
+    assert motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = client.download_motion(
+        DEFAULT_CHARACTER_ID, motion_id, output_format="glb", fps=30,
+    )
+    (ARTIFACTS_DIR / "video_dance_30.glb").write_bytes(data)
+
+
+@requires_api_key
+@pytest.mark.asyncio
+async def test_acreate_video_to_motion():
+    client = Client(API_KEY, staging=True)
+    job_output = await client.acreate_video_to_motion(str(FIXTURES_DIR / "dance.mp4"))
+
+    assert job_output.job_id
+    assert job_output.status
+
+    job_output = await _apoll_job(client, job_output.job_id)
+    assert job_output.status == "FINISHED"
+
+    motion_id = job_output.result["motion"]["id"]
+    assert motion_id
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = await client.adownload_motion(
+        DEFAULT_CHARACTER_ID, motion_id, output_format="glb", fps=30,
+    )
+    (ARTIFACTS_DIR / "async_video_dance_30.glb").write_bytes(data)

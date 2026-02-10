@@ -27,6 +27,13 @@ class MotionOutput:
 
 
 @dataclass
+class JobOutput:
+    job_id: str
+    status: str
+    result: dict | None = None
+
+
+@dataclass
 class CharacterOutput:
     url: str
     character_id: str
@@ -62,12 +69,13 @@ DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
 DEFAULT_FPS = 30
 DEFAULT_NO_MESH = True
 DEFAULT_FOOT_IK = True
-DEFAULT_MOTION_LENGTH = 1.0
+DEFAULT_LENGTH = 10.0
 DEFAULT_CFG_SCALE = 1.0
 DEFAULT_SEED = 0
 DEFAULT_INTERNAL_IK = True
 DEFAULT_FRONT_FACING = True
 DEFAULT_TIMEOUT = 120.0
+_SUPPORTED_VIDEO_FORMATS = {".mp4", ".mov", ".avi"}
 
 _TEXT_TO_MOTION_V1_MUTATION = """
 mutation TextToMotion($prompt: String!, $character_id: String!, $model: String!, $foot_ik: Boolean!) {
@@ -81,8 +89,8 @@ mutation TextToMotion($prompt: String!, $character_id: String!, $model: String!,
 """
 
 _TEXT_TO_MOTION_V2_MUTATION = """
-mutation CreateTextToMotion($prompt: String!, $character_id: String!, $model: String!, $foot_ik: Boolean!, $cfg_scale: Float, $motion_length: Int, $seed: Int, $retargeting_ik: Boolean) {
-    create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik, cfg_scale: $cfg_scale, motion_length: $motion_length, seed: $seed, retargeting_ik: $retargeting_ik) {
+mutation CreateTextToMotion($prompt: String!, $character_id: String!, $model: String!, $foot_ik: Boolean!, $cfg_scale: Float, $length: Float, $seed: Int, $retargeting_ik: Boolean) {
+    create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik, cfg_scale: $cfg_scale, length: $length, seed: $seed, retargeting_ik: $retargeting_ik) {
         motion {
             id
             name
@@ -103,6 +111,26 @@ mutation CreateCharacter($name: String!, $file: Upload!, $auto_rig: Boolean, $au
 }
 """
 
+_CREATE_VIDEO_TO_MOTION_MUTATION = """
+mutation CreateVideoToMotion($file: Upload!, $motion_name: String!) {
+    create_video_to_motion(file: $file, motion_name: $motion_name) {
+        job {
+            id
+            status
+        }
+    }
+}
+"""
+
+_GET_JOB_QUERY = """
+query GetJob($job_id: String!) {
+    job(job_id: $job_id) {
+        id
+        status
+        result
+    }
+}
+"""
 
 class Client:
     def __init__(self, api_key: str, *, staging: bool = False, timeout: float = DEFAULT_TIMEOUT):
@@ -170,7 +198,7 @@ class Client:
         character_id: str,
         foot_ik: bool,
         cfg_scale: float,
-        motion_length: float,
+        length: float,
         seed: int,
         internal_ik: bool,
     ) -> dict:
@@ -181,7 +209,7 @@ class Client:
             "model": "text-to-motion-bucmd",
             "foot_ik": foot_ik,
             "cfg_scale": cfg_scale,
-            "motion_length": int(motion_length * motion_length_fps),
+            "length": length,
             "seed": None if seed == 0 else seed,
             "retargeting_ik": internal_ik,
         }
@@ -261,7 +289,7 @@ class Client:
         *,
         character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
-        motion_length: float = DEFAULT_MOTION_LENGTH,
+        length: float = DEFAULT_LENGTH,
         cfg_scale: float = DEFAULT_CFG_SCALE,
         seed: int = DEFAULT_SEED,
         internal_ik: bool = DEFAULT_INTERNAL_IK,
@@ -271,7 +299,7 @@ class Client:
             character_id,
             foot_ik,
             cfg_scale,
-            motion_length,
+            length,
             seed,
             internal_ik,
         )
@@ -285,7 +313,7 @@ class Client:
         *,
         character_id: str = DEFAULT_CHARACTER_ID,
         foot_ik: bool = DEFAULT_FOOT_IK,
-        motion_length: float = DEFAULT_MOTION_LENGTH,
+        length: float = DEFAULT_LENGTH,
         cfg_scale: float = DEFAULT_CFG_SCALE,
         seed: int = DEFAULT_SEED,
         internal_ik: bool = DEFAULT_INTERNAL_IK,
@@ -295,7 +323,7 @@ class Client:
             character_id,
             foot_ik,
             cfg_scale,
-            motion_length,
+            length,
             seed,
             internal_ik,
         )
@@ -398,3 +426,69 @@ class Client:
         if not response.is_success:
             raise APIError(response.status_code, response.text)
         return response.content
+
+    def get_job(self, job_id: str) -> JobOutput:
+        data = self._graphql(_GET_JOB_QUERY, {"job_id": job_id})
+        job = data["job"]
+        return JobOutput(job_id=job["id"], status=job["status"], result=job.get("result"))
+
+    async def aget_job(self, job_id: str) -> JobOutput:
+        data = await self._agraphql(_GET_JOB_QUERY, {"job_id": job_id})
+        job = data["job"]
+        return JobOutput(job_id=job["id"], status=job["status"], result=job.get("result"))
+
+    @staticmethod
+    def _prepare_video_to_motion(file_path: str, motion_name: str | None) -> tuple[dict, str]:
+        filename = os.path.basename(file_path)
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in _SUPPORTED_VIDEO_FORMATS:
+            raise Error(f"Unsupported video format '{ext}'. Supported: {', '.join(sorted(_SUPPORTED_VIDEO_FORMATS))}")
+        if motion_name is None:
+            motion_name = os.path.splitext(filename)[0]
+        variables = {"motion_name": motion_name, "file": None}
+        return variables, filename
+
+    @staticmethod
+    def _build_video_to_motion_output(result: dict) -> JobOutput:
+        job = result["data"]["create_video_to_motion"]["job"]
+        return JobOutput(job_id=job["id"], status=job["status"])
+
+    def create_video_to_motion(
+        self,
+        file_path: str,
+        *,
+        motion_name: str | None = None,
+    ) -> JobOutput:
+        variables, filename = self._prepare_video_to_motion(file_path, motion_name)
+        operations = json.dumps({"query": _CREATE_VIDEO_TO_MOTION_MUTATION, "variables": variables})
+        map_data = json.dumps({"0": ["variables.file"]})
+
+        with open(file_path, "rb") as f:
+            response = self.session.post(
+                self.graphql_url,
+                data={"operations": operations, "map": map_data},
+                files={"0": (filename, f, "application/octet-stream")},
+            )
+
+        result = self._check_response(response)
+        return self._build_video_to_motion_output(result)
+
+    async def acreate_video_to_motion(
+        self,
+        file_path: str,
+        *,
+        motion_name: str | None = None,
+    ) -> JobOutput:
+        variables, filename = self._prepare_video_to_motion(file_path, motion_name)
+        operations = json.dumps({"query": _CREATE_VIDEO_TO_MOTION_MUTATION, "variables": variables})
+        map_data = json.dumps({"0": ["variables.file"]})
+
+        with open(file_path, "rb") as f:
+            response = await self.async_client.post(
+                self.graphql_url,
+                data={"operations": operations, "map": map_data},
+                files={"0": (filename, f, "application/octet-stream")},
+            )
+
+        result = self._check_response(response)
+        return self._build_video_to_motion_output(result)
