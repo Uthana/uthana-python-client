@@ -1,6 +1,6 @@
 [project]
 name = "uthana"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python wrapper around Uthana's HTTP API"
 readme = "README.md"
 requires-python = ">=3.13"
