@@ -1,5 +1,5 @@
 [project]
-name = "uthana-api"
+name = "uthana"
 version = "0.1.0"
 description = "Python wrapper around Uthana's HTTP API"
 readme = "README.md"
