@@ -3,6 +3,7 @@ name = "uthana"
 version = "0.1.2"
 description = "Python wrapper around Uthana's HTTP API"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
     "httpx",
