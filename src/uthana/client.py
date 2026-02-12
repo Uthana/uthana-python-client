@@ -64,21 +64,13 @@ class DefaultCharacters:
     y_bot: str = "cJM4ngRqXg83"
 
 
-DEFAULT_CHARACTER_ID = DefaultCharacters.tar
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
-DEFAULT_FPS = 30
-DEFAULT_NO_MESH = True
-DEFAULT_FOOT_IK = True
-DEFAULT_LENGTH = 10.0
-DEFAULT_CFG_SCALE = 1.0
-DEFAULT_SEED = 0
-DEFAULT_INTERNAL_IK = True
-DEFAULT_FRONT_FACING = True
+
 DEFAULT_TIMEOUT = 120.0
 _SUPPORTED_VIDEO_FORMATS = {".mp4", ".mov", ".avi"}
 
 _TEXT_TO_MOTION_V1_MUTATION = """
-mutation TextToMotion($prompt: String!, $character_id: String!, $model: String!, $foot_ik: Boolean!) {
+mutation TextToMotion($prompt: String!, $character_id: String, $model: String!, $foot_ik: Boolean) {
     create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik) {
         motion {
             id
@@ -89,7 +81,7 @@ mutation TextToMotion($prompt: String!, $character_id: String!, $model: String!,
 """
 
 _TEXT_TO_MOTION_V2_MUTATION = """
-mutation CreateTextToMotion($prompt: String!, $character_id: String!, $model: String!, $foot_ik: Boolean!, $cfg_scale: Float, $length: Float, $seed: Int, $retargeting_ik: Boolean) {
+mutation CreateTextToMotion($prompt: String!, $character_id: String, $model: String!, $foot_ik: Boolean, $cfg_scale: Float, $length: Float, $seed: Int, $retargeting_ik: Boolean) {
     create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik, cfg_scale: $cfg_scale, length: $length, seed: $seed, retargeting_ik: $retargeting_ik) {
         motion {
             id
@@ -184,7 +176,7 @@ class Client:
         return result["data"]
 
     @staticmethod
-    def _prepare_text_to_motion_v1(prompt: str, character_id: str, foot_ik: bool) -> dict:
+    def _prepare_text_to_motion_v1(prompt: str, character_id: str | None, foot_ik: bool | None) -> dict:
         return {
             "prompt": prompt,
             "character_id": character_id,
@@ -195,14 +187,13 @@ class Client:
     @staticmethod
     def _prepare_text_to_motion_v2(
         prompt: str,
-        character_id: str,
-        foot_ik: bool,
-        cfg_scale: float,
-        length: float,
-        seed: int,
-        internal_ik: bool,
+        character_id: str | None,
+        foot_ik: bool | None,
+        cfg_scale: float | None,
+        length: float | None,
+        seed: int | None,
+        internal_ik: bool | None,
     ) -> dict:
-        motion_length_fps = 20
         return {
             "prompt": prompt,
             "character_id": character_id,
@@ -210,21 +201,26 @@ class Client:
             "foot_ik": foot_ik,
             "cfg_scale": cfg_scale,
             "length": length,
-            "seed": None if seed == 0 else seed,
+            "seed": seed,
             "retargeting_ik": internal_ik,
         }
 
     def _motion_url(
-        self, character_id: str, motion_id: str, output_format: OutputFormat, fps: int, no_mesh: bool
+        self, character_id: str, motion_id: str, output_format: OutputFormat, fps: int | None, no_mesh: bool | None
     ) -> str:
         ext = output_format.lower()
-        return (
-            f"{self.base_url}/motion/file/motion_viewer/{character_id}/{motion_id}"
-            f"/{ext}/{character_id}-{motion_id}.{ext}?fps={fps}&no_mesh={no_mesh}"
-        )
+        url = f"{self.base_url}/motion/file/motion_viewer/{character_id}/{motion_id}/{ext}/{character_id}-{motion_id}.{ext}"
+        options = []
+        if fps is not None:
+            options.append(f"fps={fps}")
+        if no_mesh is not None:
+            options.append(f"no_mesh={'true' if no_mesh else 'false'}")
+        if len(options) > 0:
+            url += f"?{'&'.join(options)}"
+        return url
 
     @staticmethod
-    def _prepare_create_character(file_path: str, front_facing: bool) -> tuple[dict, str, str, str]:
+    def _prepare_create_character(file_path: str, front_facing: bool | None) -> tuple[dict, str, str, str]:
         filename = os.path.basename(file_path)
         name = os.path.splitext(filename)[0]
         ext = detect_mesh_format(file_path)
@@ -263,36 +259,40 @@ class Client:
         self,
         prompt: str,
         *,
-        character_id: str = DEFAULT_CHARACTER_ID,
-        foot_ik: bool = DEFAULT_FOOT_IK,
+        character_id: str | None = None,
+        foot_ik: bool | None = None,
     ) -> MotionOutput:
         variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
         data = self._graphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
+        if character_id is None:
+            character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     async def acreate_text_to_motion_v1(
         self,
         prompt: str,
         *,
-        character_id: str = DEFAULT_CHARACTER_ID,
-        foot_ik: bool = DEFAULT_FOOT_IK,
+        character_id: str | None = None,
+        foot_ik: bool | None = None,
     ) -> MotionOutput:
         variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
         data = await self._agraphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
+        if character_id is None:
+            character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     def create_text_to_motion_v2(
         self,
         prompt: str,
         *,
-        character_id: str = DEFAULT_CHARACTER_ID,
-        foot_ik: bool = DEFAULT_FOOT_IK,
-        length: float = DEFAULT_LENGTH,
-        cfg_scale: float = DEFAULT_CFG_SCALE,
-        seed: int = DEFAULT_SEED,
-        internal_ik: bool = DEFAULT_INTERNAL_IK,
+        character_id: str | None = None,
+        foot_ik: bool | None = None,
+        length: float | None = None,
+        cfg_scale: float | None = None,
+        seed: int | None = None,
+        internal_ik: bool | None = None,
     ) -> MotionOutput:
         variables = self._prepare_text_to_motion_v2(
             prompt,
@@ -305,18 +305,20 @@ class Client:
         )
         data = self._graphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
+        if character_id is None:
+            character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     async def acreate_text_to_motion_v2(
         self,
         prompt: str,
         *,
-        character_id: str = DEFAULT_CHARACTER_ID,
-        foot_ik: bool = DEFAULT_FOOT_IK,
-        length: float = DEFAULT_LENGTH,
-        cfg_scale: float = DEFAULT_CFG_SCALE,
-        seed: int = DEFAULT_SEED,
-        internal_ik: bool = DEFAULT_INTERNAL_IK,
+        character_id: str | None = None,
+        foot_ik: bool | None = None,
+        length: float | None = None,
+        cfg_scale: float | None = None,
+        seed: int | None = None,
+        internal_ik: bool | None = None,
     ) -> MotionOutput:
         variables = self._prepare_text_to_motion_v2(
             prompt,
@@ -329,13 +331,15 @@ class Client:
         )
         data = await self._agraphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
+        if character_id is None:
+            character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
     def create_character(
         self,
         file_path: str,
         *,
-        front_facing: bool = DEFAULT_FRONT_FACING,
+        front_facing: bool | None = None,
     ) -> CharacterOutput:
         variables, name, ext, _ = self._prepare_create_character(file_path, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
@@ -355,7 +359,7 @@ class Client:
         self,
         file_path: str,
         *,
-        front_facing: bool = DEFAULT_FRONT_FACING,
+        front_facing: bool | None = None,
     ) -> CharacterOutput:
         variables, name, ext, _ = self._prepare_create_character(file_path, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
@@ -403,8 +407,8 @@ class Client:
         motion_id: str,
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        fps: int | None = None,
+        no_mesh: bool | None = None,
     ) -> bytes:
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
         response = self.session.get(url)
@@ -418,8 +422,8 @@ class Client:
         motion_id: str,
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-        fps: int = DEFAULT_FPS,
-        no_mesh: bool = DEFAULT_NO_MESH,
+        fps: int | None = None,
+        no_mesh: bool | None = None,
     ) -> bytes:
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
         response = await self.async_client.get(url)

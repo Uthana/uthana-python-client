@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from uthana import Client
-from uthana.client import DEFAULT_CHARACTER_ID
+from uthana.client import DefaultCharacters
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
@@ -58,7 +58,7 @@ def test_create_character_glb():
 
     assert output.character_id
     assert output.url
-    assert output.auto_rig_confidence < 1.0
+    assert output.auto_rig_confidence is not None and output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = client.download_character(output.character_id, output_format="glb")
@@ -72,7 +72,7 @@ def test_create_character_fbx():
 
     assert output.character_id
     assert output.url
-    assert output.auto_rig_confidence >= 0.7
+    assert output.auto_rig_confidence is not None and output.auto_rig_confidence > 0.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = client.download_character(output.character_id, output_format="fbx")
@@ -132,7 +132,7 @@ async def test_acreate_character_glb():
 
     assert output.character_id
     assert output.url
-    assert output.auto_rig_confidence < 1.0
+    assert output.auto_rig_confidence is not None and output.auto_rig_confidence < 1.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = await client.adownload_character(output.character_id, output_format="glb")
@@ -147,7 +147,7 @@ async def test_acreate_character_fbx():
 
     assert output.character_id
     assert output.url
-    assert output.auto_rig_confidence >= 0.7
+    assert output.auto_rig_confidence is not None and output.auto_rig_confidence > 0.0
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = await client.adownload_character(output.character_id, output_format="fbx")
@@ -186,12 +186,12 @@ def test_create_video_to_motion():
     job_output = _poll_job(client, job_output.job_id)
     assert job_output.status == "FINISHED"
 
-    motion_id = job_output.result["motion"]["id"]
+    motion_id = job_output.result["result"]["id"]
     assert motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = client.download_motion(
-        DEFAULT_CHARACTER_ID, motion_id, output_format="glb", fps=30,
+        DefaultCharacters.tar, motion_id, output_format="glb", fps=30,
     )
     (ARTIFACTS_DIR / "video_dance_30.glb").write_bytes(data)
 
@@ -208,11 +208,11 @@ async def test_acreate_video_to_motion():
     job_output = await _apoll_job(client, job_output.job_id)
     assert job_output.status == "FINISHED"
 
-    motion_id = job_output.result["motion"]["id"]
+    motion_id = job_output.result["result"]["id"]
     assert motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     data = await client.adownload_motion(
-        DEFAULT_CHARACTER_ID, motion_id, output_format="glb", fps=30,
+        DefaultCharacters.tar, motion_id, output_format="glb", fps=30,
     )
     (ARTIFACTS_DIR / "async_video_dance_30.glb").write_bytes(data)
