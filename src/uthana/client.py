@@ -295,6 +295,30 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
+        """Generate a 3D character animation from a natural language prompt.
+
+        Args:
+            model: Model to use for generation. ``"vqvae-v1"`` for the
+                original model or ``"diffusion-v2"`` for advanced control
+                over steps, cfg_scale, length, and seed.
+            prompt: Natural language description of the desired animation.
+            character_id: Character to animate. Defaults to
+                ``DefaultCharacters.tar``.
+            foot_ik: Enable foot inverse-kinematics for better ground
+                contact. Server default is ``False``.
+            length: Motion duration in seconds (diffusion-v2 only,
+                0.25--10, server default 10).
+            cfg_scale: Classifier-free guidance scale (diffusion-v2 only,
+                0--10, server default 2.0).
+            seed: Random seed for reproducibility (diffusion-v2 only,
+                1--99999).
+            internal_ik: Enable inverse-kinematics during retargeting
+                (diffusion-v2 only, server default ``True``).
+
+        Returns:
+            MotionOutput containing the ``motion_id`` and ``character_id``
+            which can be passed to :meth:`download_motion`.
+        """
         mutation, variables = self._prepare_and_select_text_to_motion(
             model, prompt, character_id, foot_ik, length, cfg_scale, seed, internal_ik,
         )
@@ -316,6 +340,7 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
+        """Async version of :meth:`create_text_to_motion`."""
         mutation, variables = self._prepare_and_select_text_to_motion(
             model, prompt, character_id, foot_ik, length, cfg_scale, seed, internal_ik,
         )
@@ -332,6 +357,31 @@ class Client:
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
     ) -> CharacterOutput:
+        """Upload and optionally auto-rig a 3D character model.
+
+        The character must be a humanoid mesh in FBX, GLB, or GLTF format
+        (max 20 MB by default, up to 100 MB for some organisations).  If
+        ``auto_rig`` is enabled and no skeleton is found, the service will
+        automatically rig the character.  Auto-rigging typically takes
+        30--60 seconds.
+
+        The character mesh should include at least a pelvis, left/right
+        hips, and left/right shoulders.  Non-humanoid structures, extreme
+        proportions, overlapping limbs, or large appendages (wings, tails)
+        may reduce rigging quality.
+
+        Args:
+            file_path: Local path to an FBX, GLB, or GLTF file.
+            auto_rig: Automatically rig the character when no skeleton is
+                detected. Server default is ``True``.
+            front_facing: Orient the auto-rigged character to face forward.
+                Server default is ``True``.
+
+        Returns:
+            CharacterOutput containing the ``character_id``, a download
+            ``url``, and an ``auto_rig_confidence`` score (0--1.0, where
+            1.0 indicates high confidence).
+        """
         variables, name, ext, _ = self._prepare_create_character(file_path, auto_rig, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
@@ -353,6 +403,7 @@ class Client:
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
     ) -> CharacterOutput:
+        """Async version of :meth:`create_character`."""
         variables, name, ext, _ = self._prepare_create_character(file_path, auto_rig, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
@@ -373,6 +424,17 @@ class Client:
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
     ) -> bytes:
+        """Download a previously uploaded (and optionally auto-rigged) character model.
+
+        Args:
+            character_id: Identifier of the character to download (e.g.
+                from :class:`CharacterOutput`).
+            output_format: File format — ``"glb"`` (default) or
+                ``"fbx"``.
+
+        Returns:
+            Raw bytes of the character model file in the requested format.
+        """
         ext = output_format.lower()
         url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
         response = self.session.get(url)
@@ -386,6 +448,7 @@ class Client:
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
     ) -> bytes:
+        """Async version of :meth:`download_character`."""
         ext = output_format.lower()
         url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
         response = await self.async_client.get(url)
@@ -402,6 +465,23 @@ class Client:
         fps: int | None = None,
         no_mesh: bool | None = None,
     ) -> bytes:
+        """Download a motion animation file, automatically retargeted to the given character.
+
+        Args:
+            character_id: Identifier of the character to retarget the
+                motion onto (e.g. from :class:`CharacterOutput`).
+            motion_id: Identifier of the motion to download (e.g. from
+                :class:`MotionOutput` or a completed :class:`JobOutput`).
+            output_format: File format — ``"glb"`` (default) or
+                ``"fbx"``.
+            fps: Frame rate of the exported animation.  Must be 24, 30,
+                or 60.
+            no_mesh: When ``True``, return only the animation data
+                without the character mesh.  Server default is ``False``.
+
+        Returns:
+            Raw bytes of the animation file in the requested format.
+        """
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
         response = self.session.get(url)
         if not response.is_success:
@@ -417,6 +497,7 @@ class Client:
         fps: int | None = None,
         no_mesh: bool | None = None,
     ) -> bytes:
+        """Async version of :meth:`download_motion`."""
         url = self._motion_url(character_id, motion_id, output_format, fps, no_mesh)
         response = await self.async_client.get(url)
         if not response.is_success:
@@ -455,6 +536,35 @@ class Client:
         *,
         motion_name: str | None = None,
     ) -> JobOutput:
+        """Extract motion capture data from a video of a person performing an action.
+
+        This is an asynchronous operation.  The returned :class:`JobOutput`
+        contains a ``job_id`` whose status can be polled (e.g. via
+        :meth:`get_job`) until it reaches ``FINISHED``.  Poll at
+        5-second intervals.  Possible statuses are ``RESERVED`` (queued),
+        ``READY`` (processing), ``FINISHED``, and ``FAILED``.
+
+        **Video requirements**
+
+        * Formats: MP4, MOV, or AVI.
+        * Duration: 2--60 seconds.
+        * Frame rate: 24--120 fps.
+        * Resolution: 300--4096 px.
+        * A single person must be fully visible in frame.
+        * The subject should begin standing with both feet on the ground.
+        * Use a stable camera (tripod or flat surface), a plain
+          well-lit background, and avoid harsh shadows.
+
+        Args:
+            file_path: Local path to an MP4, MOV, or AVI video file.
+            motion_name: Name for the resulting motion.  Defaults to the
+                filename stem.
+
+        Returns:
+            JobOutput containing the ``job_id`` and initial ``status``.
+            Once the job reaches ``FINISHED``, the ``result`` dict holds
+            the motion ``id`` for downloading.
+        """
         variables, filename = self._prepare_video_to_motion(file_path, motion_name)
         operations = json.dumps({"query": _CREATE_VIDEO_TO_MOTION_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
@@ -475,6 +585,7 @@ class Client:
         *,
         motion_name: str | None = None,
     ) -> JobOutput:
+        """Async version of :meth:`create_video_to_motion`."""
         variables, filename = self._prepare_video_to_motion(file_path, motion_name)
         operations = json.dumps({"query": _CREATE_VIDEO_TO_MOTION_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
