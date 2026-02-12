@@ -8,6 +8,7 @@ import httpx
 
 class Error(Exception):
     """Base exception for Uthana API errors."""
+
     pass
 
 
@@ -55,6 +56,7 @@ def detect_mesh_format(filepath: str) -> str | None:
 
 OutputFormat = Literal["glb", "fbx"]
 
+
 @dataclass(frozen=True)
 class DefaultCharacters:
     tar: str = "cXi2eAP19XwQ"
@@ -69,7 +71,7 @@ DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
 DEFAULT_TIMEOUT = 120.0
 _SUPPORTED_VIDEO_FORMATS = {".mp4", ".mov", ".avi"}
 
-_TEXT_TO_MOTION_V1_MUTATION = """
+_TEXT_TO_MOTION_VQVAE_V1_MUTATION = """
 mutation TextToMotion($prompt: String!, $character_id: String, $model: String!, $foot_ik: Boolean) {
     create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik) {
         motion {
@@ -80,7 +82,7 @@ mutation TextToMotion($prompt: String!, $character_id: String, $model: String!, 
 }
 """
 
-_TEXT_TO_MOTION_V2_MUTATION = """
+_TEXT_TO_MOTION_DIFFUSION_V2_MUTATION = """
 mutation CreateTextToMotion($prompt: String!, $character_id: String, $model: String!, $foot_ik: Boolean, $cfg_scale: Float, $length: Float, $seed: Int, $retargeting_ik: Boolean) {
     create_text_to_motion(prompt: $prompt, character_id: $character_id, model: $model, foot_ik: $foot_ik, cfg_scale: $cfg_scale, length: $length, seed: $seed, retargeting_ik: $retargeting_ik) {
         motion {
@@ -123,6 +125,7 @@ query GetJob($job_id: String!) {
     }
 }
 """
+
 
 class Client:
     def __init__(self, api_key: str, *, staging: bool = False, timeout: float = DEFAULT_TIMEOUT):
@@ -176,7 +179,7 @@ class Client:
         return result["data"]
 
     @staticmethod
-    def _prepare_text_to_motion_v1(prompt: str, character_id: str | None, foot_ik: bool | None) -> dict:
+    def _prepare_text_to_motion_vqvae_v1(prompt: str, character_id: str | None, foot_ik: bool | None) -> dict:
         return {
             "prompt": prompt,
             "character_id": character_id,
@@ -185,7 +188,7 @@ class Client:
         }
 
     @staticmethod
-    def _prepare_text_to_motion_v2(
+    def _prepare_text_to_motion_diffusion_v2(
         prompt: str,
         character_id: str | None,
         foot_ik: bool | None,
@@ -220,7 +223,9 @@ class Client:
         return url
 
     @staticmethod
-    def _prepare_create_character(file_path: str, front_facing: bool | None) -> tuple[dict, str, str, str]:
+    def _prepare_create_character(
+        file_path: str, auto_rig: bool | None, front_facing: bool | None
+    ) -> tuple[dict, str, str, str]:
         filename = os.path.basename(file_path)
         name = os.path.splitext(filename)[0]
         ext = detect_mesh_format(file_path)
@@ -230,7 +235,7 @@ class Client:
         variables = {
             "name": name,
             "file": None,
-            "auto_rig": True,
+            "auto_rig": auto_rig,
             "auto_rig_front_facing": front_facing,
         }
         return variables, name, ext, filename
@@ -255,35 +260,35 @@ class Client:
             raise APIError(400, f"GraphQL errors: {result['errors']}")
         return result
 
-    def create_text_to_motion_v1(
+    def create_text_to_motion_vqvae_v1(
         self,
         prompt: str,
         *,
         character_id: str | None = None,
         foot_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
-        data = self._graphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
+        variables = self._prepare_text_to_motion_vqvae_v1(prompt, character_id, foot_ik)
+        data = self._graphql(_TEXT_TO_MOTION_VQVAE_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
-    async def acreate_text_to_motion_v1(
+    async def acreate_text_to_motion_vqvae_v1(
         self,
         prompt: str,
         *,
         character_id: str | None = None,
         foot_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_v1(prompt, character_id, foot_ik)
-        data = await self._agraphql(_TEXT_TO_MOTION_V1_MUTATION, variables)
+        variables = self._prepare_text_to_motion_vqvae_v1(prompt, character_id, foot_ik)
+        data = await self._agraphql(_TEXT_TO_MOTION_VQVAE_V1_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
-    def create_text_to_motion_v2(
+    def create_text_to_motion_diffusion_v2(
         self,
         prompt: str,
         *,
@@ -294,7 +299,7 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_v2(
+        variables = self._prepare_text_to_motion_diffusion_v2(
             prompt,
             character_id,
             foot_ik,
@@ -303,13 +308,13 @@ class Client:
             seed,
             internal_ik,
         )
-        data = self._graphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
+        data = self._graphql(_TEXT_TO_MOTION_DIFFUSION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
-    async def acreate_text_to_motion_v2(
+    async def acreate_text_to_motion_diffusion_v2(
         self,
         prompt: str,
         *,
@@ -320,7 +325,7 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_v2(
+        variables = self._prepare_text_to_motion_diffusion_v2(
             prompt,
             character_id,
             foot_ik,
@@ -329,7 +334,7 @@ class Client:
             seed,
             internal_ik,
         )
-        data = await self._agraphql(_TEXT_TO_MOTION_V2_MUTATION, variables)
+        data = await self._agraphql(_TEXT_TO_MOTION_DIFFUSION_V2_MUTATION, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar
@@ -339,9 +344,10 @@ class Client:
         self,
         file_path: str,
         *,
+        auto_rig: bool | None = None,
         front_facing: bool | None = None,
     ) -> CharacterOutput:
-        variables, name, ext, _ = self._prepare_create_character(file_path, front_facing)
+        variables, name, ext, _ = self._prepare_create_character(file_path, auto_rig, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
@@ -359,9 +365,10 @@ class Client:
         self,
         file_path: str,
         *,
+        auto_rig: bool | None = None,
         front_facing: bool | None = None,
     ) -> CharacterOutput:
-        variables, name, ext, _ = self._prepare_create_character(file_path, front_facing)
+        variables, name, ext, _ = self._prepare_create_character(file_path, auto_rig, front_facing)
         operations = json.dumps({"query": _CREATE_CHARACTER_MUTATION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
