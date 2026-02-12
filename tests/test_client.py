@@ -29,7 +29,7 @@ def test_client_staging():
 @requires_api_key
 def test_create_text_to_motion_vqvae_v1_glb():
     client = Client(API_KEY, staging=USE_STAGING)
-    output = client.create_text_to_motion_vqvae_v1("a person walking forward")
+    output = client.create_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
     assert output.motion_id
@@ -42,7 +42,7 @@ def test_create_text_to_motion_vqvae_v1_glb():
 @requires_api_key
 def test_create_text_to_motion_vqvae_v1_fbx():
     client = Client(API_KEY, staging=USE_STAGING)
-    output = client.create_text_to_motion_vqvae_v1("a person walking forward")
+    output = client.create_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
     assert output.motion_id
@@ -87,7 +87,7 @@ def test_create_character_fbx():
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_vqvae_v1_glb():
     client = Client(API_KEY, staging=USE_STAGING)
-    output = await client.acreate_text_to_motion_vqvae_v1("a person walking forward")
+    output = await client.acreate_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
     assert output.motion_id
@@ -101,7 +101,7 @@ async def test_acreate_text_to_motion_vqvae_v1_glb():
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_vqvae_v1_fbx():
     client = Client(API_KEY, staging=USE_STAGING)
-    output = await client.acreate_text_to_motion_vqvae_v1("a person walking forward")
+    output = await client.acreate_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
     assert output.motion_id
@@ -115,7 +115,7 @@ async def test_acreate_text_to_motion_vqvae_v1_fbx():
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_diffusion_v2_glb():
     client = Client(API_KEY, staging=USE_STAGING)
-    output = await client.acreate_text_to_motion_diffusion_v2("a person dancing")
+    output = await client.acreate_text_to_motion("diffusion-v2", "a person dancing")
 
     assert output.character_id
     assert output.motion_id

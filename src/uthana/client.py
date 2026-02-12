@@ -54,6 +54,7 @@ def detect_mesh_format(filepath: str) -> str | None:
     return None
 
 
+ModelType = Literal["vqvae-v1", "diffusion-v2"]
 OutputFormat = Literal["glb", "fbx"]
 
 
@@ -260,36 +261,31 @@ class Client:
             raise APIError(400, f"GraphQL errors: {result['errors']}")
         return result
 
-    def create_text_to_motion_vqvae_v1(
+    def _prepare_and_select_text_to_motion(
         self,
+        model: ModelType,
         prompt: str,
-        *,
-        character_id: str | None = None,
-        foot_ik: bool | None = None,
-    ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_vqvae_v1(prompt, character_id, foot_ik)
-        data = self._graphql(_TEXT_TO_MOTION_VQVAE_V1_MUTATION, variables)
-        motion_id = data["create_text_to_motion"]["motion"]["id"]
-        if character_id is None:
-            character_id = DefaultCharacters.tar
-        return MotionOutput(character_id=character_id, motion_id=motion_id)
+        character_id: str | None,
+        foot_ik: bool | None,
+        length: float | None,
+        cfg_scale: float | None,
+        seed: int | None,
+        internal_ik: bool | None,
+    ) -> tuple[str, dict]:
+        if model == "vqvae-v1":
+            variables = self._prepare_text_to_motion_vqvae_v1(prompt, character_id, foot_ik)
+            return _TEXT_TO_MOTION_VQVAE_V1_MUTATION, variables
+        elif model == "diffusion-v2":
+            variables = self._prepare_text_to_motion_diffusion_v2(
+                prompt, character_id, foot_ik, cfg_scale, length, seed, internal_ik,
+            )
+            return _TEXT_TO_MOTION_DIFFUSION_V2_MUTATION, variables
+        else:
+            raise ValueError(f"Unknown model: {model!r}. Must be 'vqvae-v1' or 'diffusion-v2'.")
 
-    async def acreate_text_to_motion_vqvae_v1(
+    def create_text_to_motion(
         self,
-        prompt: str,
-        *,
-        character_id: str | None = None,
-        foot_ik: bool | None = None,
-    ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_vqvae_v1(prompt, character_id, foot_ik)
-        data = await self._agraphql(_TEXT_TO_MOTION_VQVAE_V1_MUTATION, variables)
-        motion_id = data["create_text_to_motion"]["motion"]["id"]
-        if character_id is None:
-            character_id = DefaultCharacters.tar
-        return MotionOutput(character_id=character_id, motion_id=motion_id)
-
-    def create_text_to_motion_diffusion_v2(
-        self,
+        model: ModelType,
         prompt: str,
         *,
         character_id: str | None = None,
@@ -299,23 +295,18 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_diffusion_v2(
-            prompt,
-            character_id,
-            foot_ik,
-            cfg_scale,
-            length,
-            seed,
-            internal_ik,
+        mutation, variables = self._prepare_and_select_text_to_motion(
+            model, prompt, character_id, foot_ik, length, cfg_scale, seed, internal_ik,
         )
-        data = self._graphql(_TEXT_TO_MOTION_DIFFUSION_V2_MUTATION, variables)
+        data = self._graphql(mutation, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar
         return MotionOutput(character_id=character_id, motion_id=motion_id)
 
-    async def acreate_text_to_motion_diffusion_v2(
+    async def acreate_text_to_motion(
         self,
+        model: ModelType,
         prompt: str,
         *,
         character_id: str | None = None,
@@ -325,16 +316,10 @@ class Client:
         seed: int | None = None,
         internal_ik: bool | None = None,
     ) -> MotionOutput:
-        variables = self._prepare_text_to_motion_diffusion_v2(
-            prompt,
-            character_id,
-            foot_ik,
-            cfg_scale,
-            length,
-            seed,
-            internal_ik,
+        mutation, variables = self._prepare_and_select_text_to_motion(
+            model, prompt, character_id, foot_ik, length, cfg_scale, seed, internal_ik,
         )
-        data = await self._agraphql(_TEXT_TO_MOTION_DIFFUSION_V2_MUTATION, variables)
+        data = await self._agraphql(mutation, variables)
         motion_id = data["create_text_to_motion"]["motion"]["id"]
         if character_id is None:
             character_id = DefaultCharacters.tar

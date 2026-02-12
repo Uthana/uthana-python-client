@@ -42,7 +42,7 @@ from uthana import Client
 client = Client("your-api-key")
 
 # Generate motion from a text prompt
-output = client.create_text_to_motion_vqvae_v1("a person walking forward")
+output = client.create_text_to_motion("vqvae-v1", "a person walking forward")
 
 print(output.character_id)
 print(output.motion_id)
