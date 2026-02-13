@@ -19,6 +19,11 @@ where = ["src"]
 [tool.uv]
 default-groups = ["dev"]
 
+[tool.pytest.ini_options]
+markers = [
+    "smoke: subset of full tests"
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",

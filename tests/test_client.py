@@ -15,17 +15,20 @@ requires_api_key = pytest.mark.skipif(not API_KEY, reason="UTHANA_API_KEY not se
 
 USE_STAGING = True
 
+@pytest.mark.smoke
 def test_client_init():
     client = Client("test-key")
     assert client.base_url == "https://uthana.com"
     assert client.graphql_url == "https://uthana.com/graphql"
 
 
+@pytest.mark.smoke
 def test_client_staging():
     client = Client("test-key", staging=True)
     assert client.base_url == "https://staging.uthana.com"
 
 
+@pytest.mark.smoke
 @requires_api_key
 def test_create_text_to_motion_vqvae_v1_glb():
     client = Client(API_KEY, staging=USE_STAGING)
@@ -66,6 +69,7 @@ def test_create_character_glb():
     (ARTIFACTS_DIR / "pig_rigged.glb").write_bytes(data)
 
 
+@pytest.mark.smoke
 @requires_api_key
 def test_create_character_fbx():
     client = Client(API_KEY, staging=USE_STAGING)
@@ -111,6 +115,7 @@ async def test_acreate_text_to_motion_vqvae_v1_fbx():
     (ARTIFACTS_DIR / "async_vqvae_v1_walk_60.fbx").write_bytes(data)
 
 
+@pytest.mark.smoke
 @requires_api_key
 @pytest.mark.asyncio
 async def test_acreate_text_to_motion_diffusion_v2_glb():
