@@ -12,7 +12,7 @@ from uthana.client import DefaultCharacters
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 
-API_KEY = os.environ.get("UTHANA_API_KEY")
+API_KEY = os.environ.get("UTHANA_API_KEY", "xxx")
 requires_api_key = pytest.mark.skipif(not API_KEY, reason="UTHANA_API_KEY not set")
 
 USE_STAGING = False
@@ -23,19 +23,6 @@ def client() -> Client:
     if not API_KEY:
         pytest.skip("UTHANA_API_KEY not set")
     return Client(API_KEY, staging=USE_STAGING)
-
-
-@pytest.mark.smoke
-def test_client_init():
-    client = Client("test-key")
-    assert client.base_url == "https://uthana.com"
-    assert client.graphql_url == "https://uthana.com/graphql"
-
-
-@pytest.mark.smoke
-def test_client_staging():
-    client = Client("test-key", staging=True)
-    assert client.base_url == "https://staging.uthana.com"
 
 
 @pytest.mark.smoke

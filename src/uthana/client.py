@@ -140,10 +140,11 @@ class Client:
         self.graphql_url = f"{self.base_url}/graphql"
         self.session = httpx.Client(auth=(api_key, ""), timeout=timeout)
         self.async_client = httpx.AsyncClient(auth=(api_key, ""), timeout=timeout)
+        self._log_init(domain, "uthana-python", _pkg_version("uthana"), api_key)
 
-    def _log_init(self, host: str, app: str, version: str, apikey: str, staging: bool):
+    def _log_init(self, domain: str, app: str, version: str, apikey: str):
         headers = {"User-Agent": f"{app}/{version}"}
-        r = self.session.post(f"https://{host}/graphql", json={'query': '{user{id}}'}, headers=headers)
+        r = self.session.post(f"https://{domain}/graphql", json={'query': '{user{id}}'}, headers=headers)
         r.raise_for_status()
         uid = (r.json()["data"].get("user") or {}).get("id")
 
@@ -155,11 +156,10 @@ class Client:
             "app": app,
             "userId": uid,
             "anonymousId": anon_id,
-            "properties": {"staging": staging},
             "meta": {},
         }
 
-        r = self.session.post(f"https://{host}/event", json=evt, headers=headers)
+        r = self.session.post(f"https://{domain}/event", json=evt, headers=headers)
         r.raise_for_status()
         return r.json()
 
