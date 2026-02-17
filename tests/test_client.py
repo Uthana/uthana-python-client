@@ -1,3 +1,5 @@
+# (c) Copyright 2025 Uthana, Inc. All Rights Reserved
+
 import os
 import time
 from pathlib import Path
@@ -13,7 +15,15 @@ ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 API_KEY = os.environ.get("UTHANA_API_KEY")
 requires_api_key = pytest.mark.skipif(not API_KEY, reason="UTHANA_API_KEY not set")
 
-USE_STAGING = True
+USE_STAGING = False
+
+
+@pytest.fixture(scope="module")
+def client() -> Client:
+    if not API_KEY:
+        pytest.skip("UTHANA_API_KEY not set")
+    return Client(API_KEY, staging=USE_STAGING)
+
 
 @pytest.mark.smoke
 def test_client_init():
@@ -30,8 +40,7 @@ def test_client_staging():
 
 @pytest.mark.smoke
 @requires_api_key
-def test_create_text_to_motion_vqvae_v1_glb():
-    client = Client(API_KEY, staging=USE_STAGING)
+def test_create_text_to_motion_vqvae_v1_glb(client: Client):
     output = client.create_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
@@ -43,8 +52,7 @@ def test_create_text_to_motion_vqvae_v1_glb():
 
 
 @requires_api_key
-def test_create_text_to_motion_vqvae_v1_fbx():
-    client = Client(API_KEY, staging=USE_STAGING)
+def test_create_text_to_motion_vqvae_v1_fbx(client: Client):
     output = client.create_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
@@ -56,8 +64,7 @@ def test_create_text_to_motion_vqvae_v1_fbx():
 
 
 @requires_api_key
-def test_create_character_glb():
-    client = Client(API_KEY, staging=USE_STAGING)
+def test_create_character_glb(client: Client):
     output = client.create_character(str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
@@ -71,8 +78,7 @@ def test_create_character_glb():
 
 @pytest.mark.smoke
 @requires_api_key
-def test_create_character_fbx():
-    client = Client(API_KEY, staging=USE_STAGING)
+def test_create_character_fbx(client: Client):
     output = client.create_character(str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
@@ -89,8 +95,7 @@ def test_create_character_fbx():
 
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_text_to_motion_vqvae_v1_glb():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_text_to_motion_vqvae_v1_glb(client: Client):
     output = await client.acreate_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
@@ -103,8 +108,7 @@ async def test_acreate_text_to_motion_vqvae_v1_glb():
 
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_text_to_motion_vqvae_v1_fbx():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_text_to_motion_vqvae_v1_fbx(client: Client):
     output = await client.acreate_text_to_motion("vqvae-v1", "a person walking forward")
 
     assert output.character_id
@@ -118,8 +122,7 @@ async def test_acreate_text_to_motion_vqvae_v1_fbx():
 @pytest.mark.smoke
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_text_to_motion_diffusion_v2_glb():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_text_to_motion_diffusion_v2_glb(client: Client):
     output = await client.acreate_text_to_motion("diffusion-v2", "a person dancing")
 
     assert output.character_id
@@ -132,8 +135,7 @@ async def test_acreate_text_to_motion_diffusion_v2_glb():
 
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_character_glb():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_character_glb(client: Client):
     output = await client.acreate_character(str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
@@ -147,8 +149,7 @@ async def test_acreate_character_glb():
 
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_character_fbx():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_character_fbx(client: Client):
     output = await client.acreate_character(str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
@@ -182,8 +183,7 @@ async def _apoll_job(client: Client, job_id: str, timeout: float = 900.0, interv
 
 
 @requires_api_key
-def test_create_video_to_motion():
-    client = Client(API_KEY, staging=USE_STAGING)
+def test_create_video_to_motion(client: Client):
     job_output = client.create_video_to_motion(str(FIXTURES_DIR / "dance.mp4"))
 
     assert job_output.job_id
@@ -204,8 +204,7 @@ def test_create_video_to_motion():
 
 @requires_api_key
 @pytest.mark.asyncio
-async def test_acreate_video_to_motion():
-    client = Client(API_KEY, staging=USE_STAGING)
+async def test_acreate_video_to_motion(client: Client):
     job_output = await client.acreate_video_to_motion(str(FIXTURES_DIR / "dance.mp4"))
 
     assert job_output.job_id

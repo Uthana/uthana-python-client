@@ -1,6 +1,11 @@
+# (c) Copyright 2025 Uthana, Inc. All Rights Reserved
+
 import json
 import os
+import uuid
+
 from dataclasses import dataclass
+from importlib.metadata import version as _pkg_version
 from typing import Literal
 
 import httpx
@@ -135,6 +140,28 @@ class Client:
         self.graphql_url = f"{self.base_url}/graphql"
         self.session = httpx.Client(auth=(api_key, ""), timeout=timeout)
         self.async_client = httpx.AsyncClient(auth=(api_key, ""), timeout=timeout)
+
+    def _log_init(self, host: str, app: str, version: str, apikey: str, staging: bool):
+        headers = {"User-Agent": f"{app}/{version}"}
+        r = self.session.post(f"https://{host}/graphql", json={'query': '{user{id}}'}, headers=headers)
+        r.raise_for_status()
+        uid = (r.json()["data"].get("user") or {}).get("id")
+
+        anon_id = "00000000" + str(uuid.uuid1(clock_seq=1))[8:]
+
+        evt = {
+            "type": "track",
+            "event": "initialized",
+            "app": app,
+            "userId": uid,
+            "anonymousId": anon_id,
+            "properties": {"staging": staging},
+            "meta": {},
+        }
+
+        r = self.session.post(f"https://{host}/event", json=evt, headers=headers)
+        r.raise_for_status()
+        return r.json()
 
     def _graphql(self, query: str, variables: dict | None = None) -> dict:
         response = self.session.post(
