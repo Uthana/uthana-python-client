@@ -9,7 +9,6 @@ from importlib.resources import files
 
 _TTM_DEFAULT = "vqvae-v1"
 _VTM_DEFAULT = "video-to-motion-v1"
-_STITCH_DEFAULT = "enhanced_stitch"
 
 
 def _get_default(section: str, fallback: str) -> str:
@@ -32,8 +31,3 @@ def get_default_ttm_model() -> str:
 def get_default_vtm_model() -> str:
     """Return the default video to motion model from models.ini."""
     return _get_default("vtm", _VTM_DEFAULT)
-
-
-def get_default_stitch_model() -> str:
-    """Return the default stitch model from models.ini."""
-    return _get_default("stitch", _STITCH_DEFAULT)

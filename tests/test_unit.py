@@ -5,13 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from uthana import APIError, UthanaCharacters, Error, Uthana
-from uthana.client import detect_mesh_format
-from uthana.models import (
-    get_default_stitch_model,
-    get_default_ttm_model,
-    get_default_vtm_model,
-)
+from uthana import UthanaError, UthanaCharacters, Error, Uthana, detect_mesh_format
+from uthana.utils import prepare_video_to_motion
+from uthana.models import get_default_ttm_model, get_default_vtm_model
 
 
 def test_detect_mesh_format_glb(tmp_path: Path) -> None:
@@ -40,8 +36,8 @@ def test_error_base() -> None:
     assert isinstance(err, Exception)
 
 
-def test_api_error() -> None:
-    err = APIError(404, "Not found")
+def test_uthana_error() -> None:
+    err = UthanaError(404, "Not found")
     assert err.status_code == 404
     assert err.message == "Not found"
     assert "404" in str(err)
@@ -50,21 +46,21 @@ def test_api_error() -> None:
 
 
 def test_prepare_video_to_motion_supported() -> None:
-    variables, filename = Uthana._prepare_video_to_motion("/tmp/video.mp4", None)
+    variables, filename = prepare_video_to_motion("/tmp/video.mp4", None)
     assert variables["motion_name"] == "video"
     assert filename == "video.mp4"
     assert variables["file"] is None
 
 
 def test_prepare_video_to_motion_custom_name() -> None:
-    variables, filename = Uthana._prepare_video_to_motion("/tmp/video.mp4", "my_motion")
+    variables, filename = prepare_video_to_motion("/tmp/video.mp4", "my_motion")
     assert variables["motion_name"] == "my_motion"
     assert filename == "video.mp4"
 
 
 def test_prepare_video_to_motion_unsupported_format() -> None:
     with pytest.raises(Error, match="Unsupported video format"):
-        Uthana._prepare_video_to_motion("/tmp/video.mkv", None)
+        prepare_video_to_motion("/tmp/video.mkv", None)
 
 
 def test_default_characters() -> None:
@@ -84,7 +80,13 @@ def test_motion_url(
     _mock_log: MagicMock,
 ) -> None:
     client = Uthana("fake-key")
-    url = client._motion_url("char1", "motion1", "glb", 30, False)
+    url = client._motion_url(
+        character_id="char1",
+        motion_id="motion1",
+        output_format="glb",
+        fps=30,
+        no_mesh=False,
+    )
     assert "char1" in url
     assert "motion1" in url
     assert "glb" in url
@@ -104,12 +106,6 @@ def test_get_default_vtm_model() -> None:
     assert model in ("video-to-motion-v1", "video-to-motion-v2")
 
 
-def test_get_default_stitch_model() -> None:
-    """Default stitch model is loaded from models.ini."""
-    model = get_default_stitch_model()
-    assert model == "enhanced_stitch"
-
-
 @patch("uthana.client.get_default_ttm_model", return_value="vqvae-v1")
 @patch.object(Uthana, "_log_init", return_value={})
 @patch("uthana.client.httpx.AsyncClient", return_value=MagicMock())
@@ -123,7 +119,14 @@ def test_ttm_auto_resolves_to_default(
     """When model is 'auto', it resolves to the default from models.ini."""
     client = Uthana("fake-key")
     mutation, variables = client._prepare_and_select_text_to_motion(
-        "auto", "a person walking", None, None, None, None, None, None
+        model="auto",
+        prompt="a person walking",
+        character_id=None,
+        foot_ik=None,
+        length=None,
+        cfg_scale=None,
+        seed=None,
+        internal_ik=None,
     )
     mock_get_default.assert_called_once()
     assert variables["model"] == "text-to-motion"  # vqvae-v1 uses this
@@ -138,7 +141,13 @@ def test_motion_url_no_options(
     _mock_log: MagicMock,
 ) -> None:
     client = Uthana("fake-key")
-    url = client._motion_url("char1", "motion1", "fbx", None, None)
+    url = client._motion_url(
+        character_id="char1",
+        motion_id="motion1",
+        output_format="fbx",
+        fps=None,
+        no_mesh=None,
+    )
     assert "char1" in url
     assert "motion1" in url
     assert "fbx" in url

@@ -2,34 +2,39 @@
 
 """Uthana Python client for the Uthana API."""
 
-from .client import (
-    APIError,
+from .client import Client, Uthana
+from .types import (
     CharacterInfo,
     CharacterOutput,
-    Client,
-    UthanaCharacters,
     Error,
     JobOutput,
     ModelType,
     MotionInfo,
     MotionOutput,
     OrgInfo,
+    UpdateMotionResult,
     UserInfo,
-    Uthana,
+    UthanaCharacters,
+    UthanaError,
+    VideoToMotionJobResult,
+    detect_mesh_format,
 )
 
 __all__ = [
-    "APIError",
     "CharacterInfo",
     "CharacterOutput",
     "Client",
-    "UthanaCharacters",
     "Error",
     "JobOutput",
     "ModelType",
     "MotionInfo",
     "MotionOutput",
     "OrgInfo",
+    "UpdateMotionResult",
     "UserInfo",
     "Uthana",
+    "UthanaCharacters",
+    "UthanaError",
+    "VideoToMotionJobResult",
+    "detect_mesh_format",
 ]

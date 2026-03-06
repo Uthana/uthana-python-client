@@ -201,15 +201,6 @@ async def manage_motions():
     # Favorite / unfavorite
     await uthana_client.motions.favorite("motion-id", True)
 
-    # Stitch two motions together (model defaults from models.ini)
-    output = await uthana_client.motions.create_stitched(
-        character_id=UthanaCharacters.tar,
-        leading_motion_id="motion-1",
-        trailing_motion_id="motion-2",
-        duration=0.5,
-    )
-    print(output.motion_id)
-
 
 asyncio.run(manage_motions())
 ```
