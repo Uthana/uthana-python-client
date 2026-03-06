@@ -15,14 +15,14 @@ ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 API_KEY = os.environ.get("UTHANA_API_KEY", "xxx")
 requires_api_key = pytest.mark.skipif(not API_KEY, reason="UTHANA_API_KEY not set")
 
-USE_STAGING = False
+USE_DOMAIN = os.environ.get("UTHANA_DOMAIN")  # e.g. set for non-production
 
 
 @pytest.fixture(scope="module")
 def client() -> Uthana:
     if not API_KEY:
         pytest.skip("UTHANA_API_KEY not set")
-    return Uthana(API_KEY, staging=USE_STAGING)
+    return Uthana(API_KEY, domain=USE_DOMAIN)
 
 
 @pytest.mark.smoke

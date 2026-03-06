@@ -275,6 +275,14 @@ Pre-built characters you can use without uploading your own:
 | `UthanaCharacters.quinn` | czCjWEMtWxt8 |
 | `UthanaCharacters.y_bot` | cJM4ngRqXg83 |
 
+## Custom domain
+
+Use a different API host by passing `domain=`:
+
+```python
+uthana_client = Uthana("your-api-key", domain="custom.example.com")
+```
+
 ## Support
 
 - [Discord](https://discord.gg/PbMzMPSyTG) for community support

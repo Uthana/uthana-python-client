@@ -1,5 +1,7 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
+"""Uthana Python client for the Uthana API."""
+
 from .client import (
     APIError,
     CharacterInfo,

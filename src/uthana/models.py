@@ -13,6 +13,7 @@ _STITCH_DEFAULT = "enhanced_stitch"
 
 
 def _get_default(section: str, fallback: str) -> str:
+    """Read default model from models.ini section, or return fallback."""
     try:
         config = configparser.ConfigParser()
         path = files("uthana") / "models.ini"

@@ -34,12 +34,16 @@ class APIError(Error):
 
 @dataclass
 class MotionOutput:
+    """Result of a text-to-motion or create-from-gltf request."""
+
     character_id: str
     motion_id: str
 
 
 @dataclass
 class JobOutput:
+    """Result of an async job (e.g. video-to-motion). Poll until status is FINISHED or FAILED."""
+
     job_id: str
     status: str
     result: dict | None = None
@@ -47,6 +51,8 @@ class JobOutput:
 
 @dataclass
 class CharacterOutput:
+    """Result of a character upload. Includes download URL and auto-rig confidence (0–1)."""
+
     url: str
     character_id: str
     auto_rig_confidence: float | None = None
@@ -54,6 +60,8 @@ class CharacterOutput:
 
 @dataclass
 class UserInfo:
+    """Current authenticated user."""
+
     id: str
     name: str | None
     email: str | None
@@ -62,6 +70,8 @@ class UserInfo:
 
 @dataclass
 class OrgInfo:
+    """Organization info including motion download quota."""
+
     id: str
     name: str | None
     motion_download_secs_per_month: float | None
@@ -70,6 +80,8 @@ class OrgInfo:
 
 @dataclass
 class MotionInfo:
+    """Motion metadata from list_motions."""
+
     id: str
     name: str | None
     created: str | None
@@ -77,6 +89,8 @@ class MotionInfo:
 
 @dataclass
 class CharacterInfo:
+    """Character metadata from list_characters."""
+
     id: str
     name: str | None
     created: str | None
@@ -84,6 +98,7 @@ class CharacterInfo:
 
 
 def detect_mesh_format(filepath: str) -> str | None:
+    """Detect mesh format from file header. Returns 'glb', 'fbx', or None if unknown."""
     with open(filepath, "rb") as f:
         header = f.read(20)
 
@@ -102,6 +117,8 @@ OutputFormat = Literal["glb", "fbx"]
 
 @dataclass(frozen=True)
 class UthanaCharacters:
+    """Pre-built character IDs. Use these without uploading your own character."""
+
     tar: str = "cXi2eAP19XwQ"
     ava: str = "cmEE2fT4aSaC"
     manny: str = "c43tbGks3crJ"
@@ -258,6 +275,8 @@ mutation create_stitched_motion($character_id: String!, $leading_motion_id: Stri
 
 
 class _BaseSubClient:
+    """Base for sub-clients that delegate to the parent Uthana instance."""
+
     def __init__(self, parent: "Uthana") -> None:
         self._parent = parent
 
@@ -811,10 +830,17 @@ class Uthana:
         self,
         api_key: str,
         *,
-        staging: bool = False,
+        domain: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
-        domain = "staging.uthana.com" if staging else "uthana.com"
+        """Create an Uthana client.
+
+        Args:
+            api_key: Your Uthana API key from account settings.
+            domain: API host (e.g. "uthana.com"). Defaults to production when omitted.
+            timeout: Request timeout in seconds.
+        """
+        domain = domain or "uthana.com"
         self.base_url = f"https://{domain}"
         self.graphql_url = f"{self.base_url}/graphql"
         self.session = httpx.Client(auth=(api_key, ""), timeout=timeout)
@@ -829,6 +855,7 @@ class Uthana:
         self.jobs = JobsClient(self)
 
     def _log_init(self, domain: str, app: str, version: str, apikey: str) -> dict:
+        """Log client initialization to Uthana analytics."""
         headers = {"User-Agent": f"{app}/{version}"}
         r = self.session.post(
             f"https://{domain}/graphql", json={"query": "{user{id}}"}, headers=headers
@@ -854,6 +881,7 @@ class Uthana:
         return r.json()
 
     def _graphql(self, query: str, variables: dict | None = None) -> dict:
+        """Execute a GraphQL query (sync)."""
         response = self.session.post(
             self.graphql_url,
             json={"query": query, "variables": variables or {}},
@@ -866,6 +894,7 @@ class Uthana:
         return result.get("data", {})
 
     async def _agraphql(self, query: str, variables: dict | None = None) -> dict:
+        """Execute a GraphQL query (async)."""
         response = await self.async_client.post(
             self.graphql_url,
             json={"query": query, "variables": variables or {}},
@@ -878,6 +907,7 @@ class Uthana:
         return result.get("data", {})
 
     def _check_response(self, response: httpx.Response) -> dict:
+        """Validate response and raise APIError on failure."""
         if not response.is_success:
             raise APIError(response.status_code, response.text)
         result = response.json()
@@ -893,6 +923,7 @@ class Uthana:
         fps: int | None,
         no_mesh: bool | None,
     ) -> str:
+        """Build the download URL for a motion file."""
         ext = output_format.lower()
         url = f"{self.base_url}/motion/file/motion_viewer/{character_id}/{motion_id}/{ext}/{character_id}-{motion_id}.{ext}"
         options = []
@@ -908,6 +939,7 @@ class Uthana:
     def _prepare_create_character(
         file_path: str, auto_rig: bool | None, front_facing: bool | None
     ) -> tuple[dict, str, str, str]:
+        """Prepare variables and metadata for create_character mutation."""
         filename = os.path.basename(file_path)
         name = os.path.splitext(filename)[0]
         ext = detect_mesh_format(file_path)
@@ -923,6 +955,7 @@ class Uthana:
         return variables, name, ext, filename
 
     def _build_character_output(self, result: dict, ext: str) -> CharacterOutput:
+        """Parse create_character response into CharacterOutput."""
         character = result["data"]["create_character"]["character"]
         character_id = character["id"]
         auto_rig_confidence = result["data"]["create_character"].get("auto_rig_confidence")
@@ -938,6 +971,7 @@ class Uthana:
     def _prepare_text_to_motion_vqvae_v1(
         prompt: str, character_id: str | None, foot_ik: bool | None
     ) -> dict:
+        """Build variables for vqvae-v1 text-to-motion mutation."""
         return {
             "prompt": prompt,
             "character_id": character_id,
@@ -955,6 +989,7 @@ class Uthana:
         seed: int | None,
         internal_ik: bool | None,
     ) -> dict:
+        """Build variables for diffusion-v2 text-to-motion mutation."""
         return {
             "prompt": prompt,
             "character_id": character_id,
@@ -977,6 +1012,7 @@ class Uthana:
         seed: int | None,
         internal_ik: bool | None,
     ) -> tuple[str, dict]:
+        """Resolve model, build variables, and return mutation + variables for TTM."""
         if model == "auto":
             model = get_default_ttm_model()
         if model == "vqvae-v1":
@@ -994,6 +1030,7 @@ class Uthana:
 
     @staticmethod
     def _prepare_video_to_motion(file_path: str, motion_name: str | None) -> tuple[dict, str]:
+        """Validate video format and build variables for create_video_to_motion."""
         filename = os.path.basename(file_path)
         ext = os.path.splitext(filename)[1].lower()
         if ext not in _SUPPORTED_VIDEO_FORMATS:
