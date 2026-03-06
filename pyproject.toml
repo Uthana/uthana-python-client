@@ -1,7 +1,7 @@
 [project]
 name = "uthana"
-version = "0.1.6"
-description = "Python wrapper around Uthana's HTTP API"
+version = "1.1.0-rc.0"
+description = "uthana-python-client: Python wrapper around Uthana's HTTP API"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -16,6 +16,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+uthana = ["models.ini"]
+
 [tool.uv]
 default-groups = ["dev"]
 
@@ -28,4 +31,38 @@ markers = [
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.0.0",
+    "ruff>=0.12.0",
+    "mypy>=1.11.0",
+    "pre-commit>=3.8.0",
+    "tomli>=2.0.0",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "scripts", "tests"]
+exclude = [".venv", "dist", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/uthana/client.py" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src", "scripts"]
+warn_unused_configs = true
+warn_return_any = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = false
+pretty = true
+
+[[tool.mypy.overrides]]
+module = ["httpx"]
+ignore_missing_imports = true
