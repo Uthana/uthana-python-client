@@ -8,7 +8,7 @@ from importlib.metadata import version as _pkg_version
 import httpx
 
 from .graphql import q
-from .models import get_default_ttm_model
+from .models import models
 from .modules import (
     CharactersModule,
     JobsModule,
@@ -212,7 +212,7 @@ class Uthana:
     ) -> tuple[str, dict]:
         """Resolve model, build variables, and return mutation + variables for TTM."""
         if model == "auto":
-            model = get_default_ttm_model()
+            model = models.ttm.default
         if model == "vqvae-v1":
             variables = self._prepare_text_to_motion_vqvae_v1(
                 prompt=prompt, character_id=character_id, foot_ik=foot_ik

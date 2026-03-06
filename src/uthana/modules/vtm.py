@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 
 from ..graphql import q
-from ..models import get_default_vtm_model
+from ..models import models
 from ..types import JobOutput
 from ..utils import prepare_video_to_motion
 from ._base import _BaseModule
@@ -29,7 +29,7 @@ class VTMModule(_BaseModule):
         """
         variables, filename = prepare_video_to_motion(file_path, motion_name)
         if model is None or model == "auto":
-            model = get_default_vtm_model()
+            model = models.vtm.default
         variables["model"] = model
         operations = json.dumps({"query": q.CREATE_VIDEO_TO_MOTION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
@@ -58,7 +58,7 @@ class VTMModule(_BaseModule):
         """
         variables, filename = prepare_video_to_motion(file_path, motion_name)
         if model is None or model == "auto":
-            model = get_default_vtm_model()
+            model = models.vtm.default
         variables["model"] = model
         operations = json.dumps({"query": q.CREATE_VIDEO_TO_MOTION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})

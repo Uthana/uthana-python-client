@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from ..models import get_default_ttm_model
+from ..models import models
 from ..types import ModelType, MotionOutput, UthanaCharacters
 from ._base import _BaseModule
 
@@ -29,7 +29,7 @@ class TTMModule(_BaseModule):
         Model defaults to the value in models.ini when omitted or set to \"auto\".
         """
         if model is None or model == "auto":
-            model = get_default_ttm_model()
+            model = models.ttm.default
         mutation, variables = self._parent._prepare_and_select_text_to_motion(
             model=model,
             prompt=prompt,
@@ -63,7 +63,7 @@ class TTMModule(_BaseModule):
         Model defaults to the value in models.ini when omitted or set to \"auto\".
         """
         if model is None or model == "auto":
-            model = get_default_ttm_model()
+            model = models.ttm.default
         mutation, variables = self._parent._prepare_and_select_text_to_motion(
             model=model,
             prompt=prompt,

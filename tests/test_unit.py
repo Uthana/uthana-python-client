@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from uthana import Error, Uthana, UthanaCharacters, UthanaError, detect_mesh_format
-from uthana.models import get_default_ttm_model, get_default_vtm_model
+from uthana.models import models
 from uthana.utils import prepare_video_to_motion
 
 
@@ -94,19 +94,17 @@ def test_motion_url(
     assert "no_mesh=false" in url
 
 
-def test_get_default_ttm_model() -> None:
-    """Default model is loaded from models.ini."""
-    model = get_default_ttm_model()
-    assert model in ("vqvae-v1", "diffusion-v2", "flow-matching-v1", "nearest-neighbor-v1")
+def test_models_ttm_default() -> None:
+    """Default TTM model is loaded from models.ini."""
+    assert models.ttm.default in models.ttm.models
 
 
-def test_get_default_vtm_model() -> None:
+def test_models_vtm_default() -> None:
     """Default VTM model is loaded from models.ini."""
-    model = get_default_vtm_model()
-    assert model in ("video-to-motion-v1", "video-to-motion-v2")
+    assert models.vtm.default in models.vtm.models
 
 
-@patch("uthana.client.get_default_ttm_model", return_value="vqvae-v1")
+@patch.object(models.ttm, "default", "vqvae-v1")
 @patch.object(Uthana, "_log_init", return_value={})
 @patch("uthana.client.httpx.AsyncClient", return_value=MagicMock())
 @patch("uthana.client.httpx.Client", return_value=MagicMock())
@@ -114,7 +112,6 @@ def test_ttm_auto_resolves_to_default(
     _mock_client: MagicMock,
     _mock_async: MagicMock,
     _mock_log: MagicMock,
-    mock_get_default: MagicMock,
 ) -> None:
     """When model is 'auto', it resolves to the default from models.ini."""
     client = Uthana("fake-key")
@@ -128,7 +125,6 @@ def test_ttm_auto_resolves_to_default(
         seed=None,
         internal_ik=None,
     )
-    mock_get_default.assert_called_once()
     assert variables["model"] == "text-to-motion"  # vqvae-v1 uses this
 
 
