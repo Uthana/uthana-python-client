@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/uthana.svg)](https://badge.fury.io/py/uthana)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Python wrapper around Uthana's HTTP API for text to motion, video to motion, character auto-rigging, and motion management.
+A Python client for Uthana: generate lifelike human motion from text or 2D video, create and auto-rig characters, and manage your motions.
 
 ## Install
 
