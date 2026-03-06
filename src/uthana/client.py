@@ -7,7 +7,7 @@ from importlib.metadata import version as _pkg_version
 
 import httpx
 
-from .graphql import TEXT_TO_MOTION_DIFFUSION_V2, TEXT_TO_MOTION_VQVAE_V1
+from .graphql import q
 from .models import get_default_ttm_model
 from .modules import (
     CharactersModule,
@@ -18,8 +18,8 @@ from .modules import (
     VTMModule,
 )
 from .types import (
-    CharacterOutput,
     DEFAULT_TIMEOUT,
+    CharacterOutput,
     ModelType,
     OutputFormat,
     UthanaError,
@@ -70,9 +70,7 @@ class Uthana:
         app = "uthana-python"
         version = _pkg_version("uthana")
         headers = {"User-Agent": f"{app}/{version}"}
-        r = self.session.post(
-            self.graphql_url, json={"query": "{user{id}}"}, headers=headers
-        )
+        r = self.session.post(self.graphql_url, json={"query": "{user{id}}"}, headers=headers)
         r.raise_for_status()
         data = r.json().get("data") or {}
         user = data.get("user") or {}
@@ -153,9 +151,7 @@ class Uthana:
         """Parse create_character response into CharacterOutput."""
         character = result["data"]["create_character"]["character"]
         character_id = character["id"]
-        auto_rig_confidence = result["data"]["create_character"].get(
-            "auto_rig_confidence"
-        )
+        auto_rig_confidence = result["data"]["create_character"].get("auto_rig_confidence")
 
         url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
         return CharacterOutput(
@@ -221,7 +217,7 @@ class Uthana:
             variables = self._prepare_text_to_motion_vqvae_v1(
                 prompt=prompt, character_id=character_id, foot_ik=foot_ik
             )
-            return TEXT_TO_MOTION_VQVAE_V1, variables
+            return q.TEXT_TO_MOTION_VQVAE_V1, variables
         elif model == "diffusion-v2":
             variables = self._prepare_text_to_motion_diffusion_v2(
                 prompt=prompt,
@@ -232,7 +228,7 @@ class Uthana:
                 seed=seed,
                 internal_ik=internal_ik,
             )
-            return TEXT_TO_MOTION_DIFFUSION_V2, variables
+            return q.TEXT_TO_MOTION_DIFFUSION_V2, variables
         else:
             raise ValueError(
                 f"Unknown model: {model!r}. Must be 'auto', 'vqvae-v1', or 'diffusion-v2'."

@@ -4,13 +4,7 @@
 
 from __future__ import annotations
 
-from ._base import _BaseModule
-from ..graphql import (
-    CREATE_MOTION_FAVORITE,
-    DELETE_MOTION_FAVORITE,
-    LIST_MOTIONS,
-    UPDATE_MOTION,
-)
+from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     MotionInfo,
@@ -18,6 +12,7 @@ from ..types import (
     UpdateMotionResult,
     UthanaError,
 )
+from ._base import _BaseModule
 
 
 class MotionsModule(_BaseModule):
@@ -25,7 +20,7 @@ class MotionsModule(_BaseModule):
 
     def list_sync(self) -> list[MotionInfo]:  # noqa: A001
         """List all motions for the authenticated user (sync)."""
-        data = self._parent._graphql_sync(LIST_MOTIONS)
+        data = self._parent._graphql_sync(q.LIST_MOTIONS)
         raw = data.get("motions", [])
         return [
             MotionInfo(
@@ -38,7 +33,7 @@ class MotionsModule(_BaseModule):
 
     async def list(self) -> list[MotionInfo]:  # noqa: A001
         """List all motions for the authenticated user."""
-        data = await self._parent._graphql(LIST_MOTIONS)
+        data = await self._parent._graphql(q.LIST_MOTIONS)
         raw = data.get("motions", [])
         return [
             MotionInfo(
@@ -95,50 +90,34 @@ class MotionsModule(_BaseModule):
 
     def delete_sync(self, motion_id: str) -> UpdateMotionResult:
         """Soft-delete a motion by ID (sync)."""
-        data = self._parent._graphql_sync(
-            UPDATE_MOTION, {"id": motion_id, "deleted": True}
-        )
+        data = self._parent._graphql_sync(q.UPDATE_MOTION, {"id": motion_id, "deleted": True})
         return data.get("update_motion", {})
 
     async def delete(self, motion_id: str) -> UpdateMotionResult:
         """Soft-delete a motion by ID."""
-        data = await self._parent._graphql(
-            UPDATE_MOTION, {"id": motion_id, "deleted": True}
-        )
+        data = await self._parent._graphql(q.UPDATE_MOTION, {"id": motion_id, "deleted": True})
         return data.get("update_motion", {})
 
     def rename_sync(self, motion_id: str, new_name: str) -> UpdateMotionResult:
         """Rename a motion by ID (sync)."""
-        data = self._parent._graphql_sync(
-            UPDATE_MOTION, {"id": motion_id, "name": new_name}
-        )
+        data = self._parent._graphql_sync(q.UPDATE_MOTION, {"id": motion_id, "name": new_name})
         return data.get("update_motion", {})
 
     async def rename(self, motion_id: str, new_name: str) -> UpdateMotionResult:
         """Rename a motion by ID."""
-        data = await self._parent._graphql(
-            UPDATE_MOTION, {"id": motion_id, "name": new_name}
-        )
+        data = await self._parent._graphql(q.UPDATE_MOTION, {"id": motion_id, "name": new_name})
         return data.get("update_motion", {})
 
     def favorite_sync(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite (sync)."""
         if favorite:
-            self._parent._graphql_sync(
-                CREATE_MOTION_FAVORITE, {"motion_id": motion_id}
-            )
+            self._parent._graphql_sync(q.CREATE_MOTION_FAVORITE, {"motion_id": motion_id})
         else:
-            self._parent._graphql_sync(
-                DELETE_MOTION_FAVORITE, {"motion_id": motion_id}
-            )
+            self._parent._graphql_sync(q.DELETE_MOTION_FAVORITE, {"motion_id": motion_id})
 
     async def favorite(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite."""
         if favorite:
-            await self._parent._graphql(
-                CREATE_MOTION_FAVORITE, {"motion_id": motion_id}
-            )
+            await self._parent._graphql(q.CREATE_MOTION_FAVORITE, {"motion_id": motion_id})
         else:
-            await self._parent._graphql(
-                DELETE_MOTION_FAVORITE, {"motion_id": motion_id}
-            )
+            await self._parent._graphql(q.DELETE_MOTION_FAVORITE, {"motion_id": motion_id})

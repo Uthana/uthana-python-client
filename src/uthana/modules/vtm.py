@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import json
 
-from ._base import _BaseModule
-from ..graphql import CREATE_VIDEO_TO_MOTION
+from ..graphql import q
 from ..models import get_default_vtm_model
 from ..types import JobOutput
 from ..utils import prepare_video_to_motion
+from ._base import _BaseModule
 
 
 class VTMModule(_BaseModule):
@@ -23,15 +23,15 @@ class VTMModule(_BaseModule):
         motion_name: str | None = None,
         model: str | None = None,
     ) -> JobOutput:
-        """Extract motion capture data from a video (sync). Returns a job to poll via jobs.get_sync().
+        """Extract motion capture data from a video (sync).
 
-        Model defaults to the value in models.ini when omitted or set to \"auto\".
+        Returns a job to poll via jobs.get_sync(). Model defaults to models.ini when omitted.
         """
         variables, filename = prepare_video_to_motion(file_path, motion_name)
         if model is None or model == "auto":
             model = get_default_vtm_model()
         variables["model"] = model
-        operations = json.dumps({"query": CREATE_VIDEO_TO_MOTION, "variables": variables})
+        operations = json.dumps({"query": q.CREATE_VIDEO_TO_MOTION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
@@ -60,7 +60,7 @@ class VTMModule(_BaseModule):
         if model is None or model == "auto":
             model = get_default_vtm_model()
         variables["model"] = model
-        operations = json.dumps({"query": CREATE_VIDEO_TO_MOTION, "variables": variables})
+        operations = json.dumps({"query": q.CREATE_VIDEO_TO_MOTION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:

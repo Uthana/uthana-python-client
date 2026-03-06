@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from uthana import UthanaError, UthanaCharacters, Error, Uthana, detect_mesh_format
-from uthana.utils import prepare_video_to_motion
+from uthana import Error, Uthana, UthanaCharacters, UthanaError, detect_mesh_format
 from uthana.models import get_default_ttm_model, get_default_vtm_model
+from uthana.utils import prepare_video_to_motion
 
 
 def test_detect_mesh_format_glb(tmp_path: Path) -> None:

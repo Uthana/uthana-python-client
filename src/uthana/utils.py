@@ -4,7 +4,7 @@
 
 import os
 
-from .types import Error, SUPPORTED_VIDEO_FORMATS, detect_mesh_format
+from .types import SUPPORTED_VIDEO_FORMATS, Error, detect_mesh_format
 
 
 def prepare_create_character(
@@ -31,9 +31,8 @@ def prepare_video_to_motion(file_path: str, motion_name: str | None) -> tuple[di
     filename = os.path.basename(file_path)
     ext = os.path.splitext(filename)[1].lower()
     if ext not in SUPPORTED_VIDEO_FORMATS:
-        raise Error(
-            f"Unsupported video format '{ext}'. Supported: {', '.join(sorted(SUPPORTED_VIDEO_FORMATS))}"
-        )
+        supported = ", ".join(sorted(SUPPORTED_VIDEO_FORMATS))
+        raise Error(f"Unsupported video format '{ext}'. Supported: {supported}")
     if motion_name is None:
         motion_name = os.path.splitext(filename)[0]
     variables = {"motion_name": motion_name, "file": None}

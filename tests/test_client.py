@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from uthana import UthanaCharacters, JobOutput, Uthana
+from uthana import JobOutput, Uthana, UthanaCharacters
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
@@ -196,7 +196,9 @@ def test_create_video_to_motion(client: Uthana) -> None:
     assert motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
-    data = client.motions.download_sync(UthanaCharacters.tar, motion_id, output_format="glb", fps=30)
+    data = client.motions.download_sync(
+        UthanaCharacters.tar, motion_id, output_format="glb", fps=30
+    )
     (ARTIFACTS_DIR / "video_dance_30.glb").write_bytes(data)
 
 

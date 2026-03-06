@@ -4,9 +4,9 @@
 
 from __future__ import annotations
 
-from ._base import _BaseModule
-from ..graphql import GET_ORG, GET_USER
+from ..graphql import q
 from ..types import OrgInfo, UserInfo
+from ._base import _BaseModule
 
 
 class OrgModule(_BaseModule):
@@ -14,7 +14,7 @@ class OrgModule(_BaseModule):
 
     def get_user_sync(self) -> UserInfo:
         """Get current user information (sync)."""
-        data = self._parent._graphql_sync(GET_USER)
+        data = self._parent._graphql_sync(q.GET_USER)
         u = data.get("user") or {}
         return UserInfo(
             id=u.get("id", ""),
@@ -25,7 +25,7 @@ class OrgModule(_BaseModule):
 
     async def get_user(self) -> UserInfo:
         """Get current user information."""
-        data = await self._parent._graphql(GET_USER)
+        data = await self._parent._graphql(q.GET_USER)
         u = data.get("user") or {}
         return UserInfo(
             id=u.get("id", ""),
@@ -36,7 +36,7 @@ class OrgModule(_BaseModule):
 
     def get_org_sync(self) -> OrgInfo:
         """Get current organization information including quota (sync)."""
-        data = self._parent._graphql_sync(GET_ORG)
+        data = self._parent._graphql_sync(q.GET_ORG)
         o = data.get("org") or {}
         return OrgInfo(
             id=o.get("id", ""),
@@ -49,7 +49,7 @@ class OrgModule(_BaseModule):
 
     async def get_org(self) -> OrgInfo:
         """Get current organization information including quota."""
-        data = await self._parent._graphql(GET_ORG)
+        data = await self._parent._graphql(q.GET_ORG)
         o = data.get("org") or {}
         return OrgInfo(
             id=o.get("id", ""),

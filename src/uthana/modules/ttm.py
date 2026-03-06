@@ -4,9 +4,9 @@
 
 from __future__ import annotations
 
-from ._base import _BaseModule
 from ..models import get_default_ttm_model
 from ..types import ModelType, MotionOutput, UthanaCharacters
+from ._base import _BaseModule
 
 
 class TTMModule(_BaseModule):

@@ -6,18 +6,18 @@ from __future__ import annotations
 
 import json
 
-from ._base import _BaseModule
-from ..graphql import CREATE_CHARACTER, CREATE_MOTION_FROM_GLTF, LIST_CHARACTERS
+from ..graphql import q
 from ..types import (
+    DEFAULT_OUTPUT_FORMAT,
     CharacterInfo,
     CharacterOutput,
-    DEFAULT_OUTPUT_FORMAT,
     MotionOutput,
     OutputFormat,
     UthanaCharacters,
     UthanaError,
 )
 from ..utils import prepare_create_character
+from ._base import _BaseModule
 
 
 class CharactersModule(_BaseModule):
@@ -31,10 +31,8 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
     ) -> CharacterOutput:
         """Upload and optionally auto-rig a 3D character model (sync)."""
-        variables, name, ext, _ = prepare_create_character(
-            file_path, auto_rig, front_facing
-        )
-        operations = json.dumps({"query": CREATE_CHARACTER, "variables": variables})
+        variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
+        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
@@ -55,10 +53,8 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
     ) -> CharacterOutput:
         """Upload and optionally auto-rig a 3D character model."""
-        variables, name, ext, _ = prepare_create_character(
-            file_path, auto_rig, front_facing
-        )
-        operations = json.dumps({"query": CREATE_CHARACTER, "variables": variables})
+        variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
+        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
@@ -73,7 +69,7 @@ class CharactersModule(_BaseModule):
 
     def list_sync(self) -> list[CharacterInfo]:  # noqa: A001
         """List all characters for the authenticated user (sync)."""
-        data = self._parent._graphql_sync(LIST_CHARACTERS)
+        data = self._parent._graphql_sync(q.LIST_CHARACTERS)
         raw = data.get("characters", [])
         return [
             CharacterInfo(
@@ -87,7 +83,7 @@ class CharactersModule(_BaseModule):
 
     async def list(self) -> list[CharacterInfo]:  # noqa: A001
         """List all characters for the authenticated user."""
-        data = await self._parent._graphql(LIST_CHARACTERS)
+        data = await self._parent._graphql(q.LIST_CHARACTERS)
         raw = data.get("characters", [])
         return [
             CharacterInfo(
@@ -157,7 +153,7 @@ class CharactersModule(_BaseModule):
             "motionName": motion_name,
             "characterId": char_id,
         }
-        data = self._parent._graphql_sync(CREATE_MOTION_FROM_GLTF, variables)
+        data = self._parent._graphql_sync(q.CREATE_MOTION_FROM_GLTF, variables)
         gltf_data = data.get("create_motion_from_gltf", {})
         motion = gltf_data.get("motion") or {}
         motion_id = motion.get("id")
@@ -179,7 +175,7 @@ class CharactersModule(_BaseModule):
             "motionName": motion_name,
             "characterId": char_id,
         }
-        data = await self._parent._graphql(CREATE_MOTION_FROM_GLTF, variables)
+        data = await self._parent._graphql(q.CREATE_MOTION_FROM_GLTF, variables)
         gltf_data = data.get("create_motion_from_gltf", {})
         motion = gltf_data.get("motion") or {}
         motion_id = motion.get("id")

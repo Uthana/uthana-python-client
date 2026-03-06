@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import json
 
-from ._base import _BaseModule
-from ..graphql import GET_JOB
+from ..graphql import q
 from ..types import JobOutput
+from ._base import _BaseModule
 
 
 class JobsModule(_BaseModule):
@@ -16,7 +16,7 @@ class JobsModule(_BaseModule):
 
     def get_sync(self, job_id: str) -> JobOutput:
         """Get the status and result of an async job (sync)."""
-        data = self._parent._graphql_sync(GET_JOB, {"job_id": job_id})
+        data = self._parent._graphql_sync(q.GET_JOB, {"job_id": job_id})
         job = data["job"]
         result = job.get("result")
         if isinstance(result, str):
@@ -32,7 +32,7 @@ class JobsModule(_BaseModule):
 
     async def get(self, job_id: str) -> JobOutput:
         """Get the status and result of an async job."""
-        data = await self._parent._graphql(GET_JOB, {"job_id": job_id})
+        data = await self._parent._graphql(q.GET_JOB, {"job_id": job_id})
         job = data["job"]
         result = job.get("result")
         if isinstance(result, str):

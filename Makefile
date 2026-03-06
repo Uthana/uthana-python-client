@@ -13,10 +13,10 @@ typecheck:
 	uv run mypy src scripts
 
 precommit-install:
-	uv run pre-commit install
+	.venv/bin/python -m pre_commit install
 
 precommit:
-	uv run pre-commit run --all-files
+	.venv/bin/python -m pre_commit run --all-files
 
 test:
 	uv run pytest

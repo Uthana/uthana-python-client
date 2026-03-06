@@ -2,7 +2,11 @@
 
 """GraphQL query and mutation strings for the Uthana API."""
 
-TEXT_TO_MOTION_VQVAE_V1 = """
+
+class _GraphQL:
+    """Namespace for GraphQL query and mutation strings. Use: from uthana.graphql import q."""
+
+    TEXT_TO_MOTION_VQVAE_V1 = """
 mutation TextToMotion(
     $prompt: String!,
     $character_id: String,
@@ -23,7 +27,7 @@ mutation TextToMotion(
 }
 """
 
-TEXT_TO_MOTION_DIFFUSION_V2 = """
+    TEXT_TO_MOTION_DIFFUSION_V2 = """
 mutation CreateTextToMotion(
     $prompt: String!,
     $character_id: String,
@@ -52,7 +56,7 @@ mutation CreateTextToMotion(
 }
 """
 
-CREATE_CHARACTER = """
+    CREATE_CHARACTER = """
 mutation CreateCharacter(
     $name: String!,
     $file: Upload!,
@@ -74,7 +78,7 @@ mutation CreateCharacter(
 }
 """
 
-CREATE_VIDEO_TO_MOTION = """
+    CREATE_VIDEO_TO_MOTION = """
 mutation CreateVideoToMotion($file: Upload!, $motion_name: String!, $model: String) {
     create_video_to_motion(file: $file, motion_name: $motion_name, model: $model) {
         job {
@@ -85,7 +89,7 @@ mutation CreateVideoToMotion($file: Upload!, $motion_name: String!, $model: Stri
 }
 """
 
-GET_JOB = """
+    GET_JOB = """
 query GetJob($job_id: String!) {
     job(job_id: $job_id) {
         id
@@ -95,7 +99,7 @@ query GetJob($job_id: String!) {
 }
 """
 
-LIST_MOTIONS = """
+    LIST_MOTIONS = """
 query {
     motions {
         id
@@ -105,7 +109,7 @@ query {
 }
 """
 
-LIST_CHARACTERS = """
+    LIST_CHARACTERS = """
 query {
     characters {
         id
@@ -116,7 +120,7 @@ query {
 }
 """
 
-GET_USER = """
+    GET_USER = """
 query {
     user {
         id
@@ -127,7 +131,7 @@ query {
 }
 """
 
-GET_ORG = """
+    GET_ORG = """
 query {
     org {
         id
@@ -138,7 +142,7 @@ query {
 }
 """
 
-CREATE_MOTION_FROM_GLTF = """
+    CREATE_MOTION_FROM_GLTF = """
 mutation create_motion_from_gltf($gltf: String!, $motionName: String!, $characterId: String) {
     create_motion_from_gltf(gltf: $gltf, motion_name: $motionName, character_id: $characterId) {
         motion { id }
@@ -146,7 +150,7 @@ mutation create_motion_from_gltf($gltf: String!, $motionName: String!, $characte
 }
 """
 
-UPDATE_MOTION = """
+    UPDATE_MOTION = """
 mutation update_motion($id: String!, $name: String, $deleted: Boolean) {
     update_motion(id: $id, name: $name, deleted: $deleted) {
         id
@@ -156,7 +160,7 @@ mutation update_motion($id: String!, $name: String, $deleted: Boolean) {
 }
 """
 
-CREATE_MOTION_FAVORITE = """
+    CREATE_MOTION_FAVORITE = """
 mutation create_motion_favorite($motion_id: String!) {
     create_motion_favorite(motion_id: $motion_id) {
         id
@@ -165,10 +169,13 @@ mutation create_motion_favorite($motion_id: String!) {
 }
 """
 
-DELETE_MOTION_FAVORITE = """
+    DELETE_MOTION_FAVORITE = """
 mutation delete_motion_favorite($motion_id: String!) {
     delete_motion_favorite(motion_id: $motion_id) {
         id
     }
 }
 """
+
+
+q = _GraphQL()
