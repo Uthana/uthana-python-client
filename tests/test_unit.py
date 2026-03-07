@@ -7,7 +7,7 @@ import pytest
 
 from uthana import Error, Uthana, UthanaCharacters, UthanaError, detect_mesh_format
 from uthana.models import models
-from uthana.utils import prepare_video_to_motion
+from uthana.utils import prepare_create_character, prepare_video_to_motion
 
 
 def test_detect_mesh_format_glb(tmp_path: Path) -> None:
@@ -43,6 +43,27 @@ def test_uthana_error() -> None:
     assert "404" in str(err)
     assert "Not found" in str(err)
     assert isinstance(err, Error)
+
+
+def test_prepare_create_character_glb(tmp_path: Path) -> None:
+    path = tmp_path / "model.glb"
+    path.write_bytes(b"glTF\x02\x00\x00\x00" + b"\x00" * 12)
+    variables, name, ext, filename = prepare_create_character(
+        str(path), auto_rig=True, front_facing=False
+    )
+    assert variables["name"] == "model"
+    assert variables["auto_rig"] is True
+    assert variables["auto_rig_front_facing"] is False
+    assert name == "model"
+    assert ext == "glb"
+    assert filename == "model.glb"
+
+
+def test_prepare_create_character_fallback_ext(tmp_path: Path) -> None:
+    path = tmp_path / "model.xyz"
+    path.write_bytes(b"unknown format")
+    variables, name, ext, _ = prepare_create_character(str(path), None, None)
+    assert ext == "xyz"
 
 
 def test_prepare_video_to_motion_supported() -> None:
@@ -126,6 +147,82 @@ def test_ttm_auto_resolves_to_default(
         internal_ik=None,
     )
     assert variables["model"] == "text-to-motion"  # vqvae-v1 uses this
+
+
+@patch.object(Uthana, "_log_init", return_value={})
+@patch("uthana.client.httpx.AsyncClient", return_value=MagicMock())
+@patch("uthana.client.httpx.Client", return_value=MagicMock())
+def test_ttm_diffusion_v2_variables(
+    _mock_client: MagicMock,
+    _mock_async: MagicMock,
+    _mock_log: MagicMock,
+) -> None:
+    """Diffusion-v2 model produces correct variables."""
+    client = Uthana("fake-key")
+    mutation, variables = client._prepare_and_select_text_to_motion(
+        model="diffusion-v2",
+        prompt="dancing",
+        character_id=None,
+        foot_ik=None,
+        length=5.0,
+        cfg_scale=7.5,
+        seed=42,
+        internal_ik=True,
+    )
+    assert variables["model"] == "text-to-motion-bucmd"
+    assert variables["prompt"] == "dancing"
+    assert variables["length"] == 5.0
+    assert variables["cfg_scale"] == 7.5
+    assert variables["seed"] == 42
+    assert variables["retargeting_ik"] is True
+
+
+@patch.object(Uthana, "_log_init", return_value={})
+@patch("uthana.client.httpx.AsyncClient", return_value=MagicMock())
+@patch("uthana.client.httpx.Client", return_value=MagicMock())
+def test_ttm_unknown_model_raises(
+    _mock_client: MagicMock,
+    _mock_async: MagicMock,
+    _mock_log: MagicMock,
+) -> None:
+    """Unknown model raises ValueError."""
+    client = Uthana("fake-key")
+    with pytest.raises(ValueError, match="Unknown model"):
+        client._prepare_and_select_text_to_motion(
+            model="invalid-model",  # type: ignore[arg-type]
+            prompt="walk",
+            character_id=None,
+            foot_ik=None,
+            length=None,
+            cfg_scale=None,
+            seed=None,
+            internal_ik=None,
+        )
+
+
+@patch.object(Uthana, "_log_init", return_value={})
+@patch("uthana.client.httpx.AsyncClient", return_value=MagicMock())
+@patch("uthana.client.httpx.Client", return_value=MagicMock())
+def test_build_character_output(
+    _mock_client: MagicMock,
+    _mock_async: MagicMock,
+    _mock_log: MagicMock,
+) -> None:
+    """_build_character_output parses response correctly."""
+    client = Uthana("fake-key")
+    result = {
+        "data": {
+            "create_character": {
+                "character": {"id": "char123"},
+                "auto_rig_confidence": 0.85,
+            }
+        }
+    }
+    output = client._build_character_output(result=result, ext="glb")
+    assert output.character_id == "char123"
+    assert output.auto_rig_confidence == 0.85
+    assert "char123" in output.url
+    assert output.url.endswith(".glb")
 
 
 @patch.object(Uthana, "_log_init", return_value={})

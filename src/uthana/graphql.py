@@ -99,6 +99,18 @@ query GetJob($job_id: String!) {
 }
 """
 
+    LIST_JOBS = """
+query ListJobs($method: String) {
+    jobs(method: $method) {
+        id
+        status
+        method
+        created
+        updated
+    }
+}
+"""
+
     LIST_MOTIONS = """
 query {
     motions {

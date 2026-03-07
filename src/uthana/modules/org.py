@@ -4,58 +4,30 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from ..graphql import q
-from ..types import OrgInfo, UserInfo
+from ..types import Org, User
 from ._base import _BaseModule
 
 
 class OrgModule(_BaseModule):
     """Organization and user info."""
 
-    def get_user_sync(self) -> UserInfo:
-        """Get current user information (sync)."""
-        data = self._parent._graphql_sync(q.GET_USER)
-        u = data.get("user") or {}
-        return UserInfo(
-            id=u.get("id", ""),
-            name=u.get("name"),
-            email=u.get("email"),
-            email_verified=u.get("email_verified"),
-        )
-
-    async def get_user(self) -> UserInfo:
+    async def get_user(self) -> User:
         """Get current user information."""
-        data = await self._parent._graphql(q.GET_USER)
-        u = data.get("user") or {}
-        return UserInfo(
-            id=u.get("id", ""),
-            name=u.get("name"),
-            email=u.get("email"),
-            email_verified=u.get("email_verified"),
+        return await self._client._graphql(
+            q.GET_USER, path="user", path_default={}, return_type=User
         )
 
-    def get_org_sync(self) -> OrgInfo:
-        """Get current organization information including quota (sync)."""
-        data = self._parent._graphql_sync(q.GET_ORG)
-        o = data.get("org") or {}
-        return OrgInfo(
-            id=o.get("id", ""),
-            name=o.get("name"),
-            motion_download_secs_per_month=o.get("motion_download_secs_per_month"),
-            motion_download_secs_per_month_remaining=o.get(
-                "motion_download_secs_per_month_remaining"
-            ),
-        )
+    def get_user_sync(self):
+        """Get current user information (sync)."""
+        return asyncio.run(self.get_user())
 
-    async def get_org(self) -> OrgInfo:
+    async def get_org(self) -> Org:
         """Get current organization information including quota."""
-        data = await self._parent._graphql(q.GET_ORG)
-        o = data.get("org") or {}
-        return OrgInfo(
-            id=o.get("id", ""),
-            name=o.get("name"),
-            motion_download_secs_per_month=o.get("motion_download_secs_per_month"),
-            motion_download_secs_per_month_remaining=o.get(
-                "motion_download_secs_per_month_remaining"
-            ),
-        )
+        return await self._client._graphql(q.GET_ORG, path="org", path_default={}, return_type=Org)
+
+    def get_org_sync(self):
+        """Get current organization information including quota (sync)."""
+        return asyncio.run(self.get_org())

@@ -4,15 +4,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
-    CharacterInfo,
-    CharacterOutput,
-    MotionOutput,
+    Character,
+    CreateCharacterResult,
     OutputFormat,
+    TextToMotionResult,
     UthanaCharacters,
     UthanaError,
 )
@@ -23,91 +24,50 @@ from ._base import _BaseModule
 class CharactersModule(_BaseModule):
     """Character management: upload, list, download, and create motions from GLTF."""
 
-    def create_sync(
-        self,
-        file_path: str,
-        *,
-        auto_rig: bool | None = None,
-        front_facing: bool | None = None,
-    ) -> CharacterOutput:
-        """Upload and optionally auto-rig a 3D character model (sync)."""
-        variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
-        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
-        map_data = json.dumps({"0": ["variables.file"]})
-
-        with open(file_path, "rb") as f:
-            response = self._parent.session.post(
-                self._parent.graphql_url,
-                data={"operations": operations, "map": map_data},
-                files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
-            )
-
-        result = self._parent._check_response(response)
-        return self._parent._build_character_output(result=result, ext=ext)
-
     async def create(
         self,
         file_path: str,
         *,
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
-    ) -> CharacterOutput:
+    ) -> CreateCharacterResult:
         """Upload and optionally auto-rig a 3D character model."""
         variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
         operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
-            response = await self._parent.async_client.post(
-                self._parent.graphql_url,
+            response = await self._client.async_client.post(
+                self._client.graphql_url,
                 data={"operations": operations, "map": map_data},
                 files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
             )
 
-        result = self._parent._check_response(response)
-        return self._parent._build_character_output(result=result, ext=ext)
+        result = self._client._check_response(response)
+        return self._client._build_character_output(result=result, ext=ext)
 
-    def list_sync(self) -> list[CharacterInfo]:  # noqa: A001
-        """List all characters for the authenticated user (sync)."""
-        data = self._parent._graphql_sync(q.LIST_CHARACTERS)
-        raw = data.get("characters", [])
-        return [
-            CharacterInfo(
-                id=c["id"],
-                name=c.get("name"),
-                created=c.get("created"),
-                updated=c.get("updated"),
-            )
-            for c in raw
-        ]
-
-    async def list(self) -> list[CharacterInfo]:  # noqa: A001
-        """List all characters for the authenticated user."""
-        data = await self._parent._graphql(q.LIST_CHARACTERS)
-        raw = data.get("characters", [])
-        return [
-            CharacterInfo(
-                id=c["id"],
-                name=c.get("name"),
-                created=c.get("created"),
-                updated=c.get("updated"),
-            )
-            for c in raw
-        ]
-
-    def download_sync(
+    def create_sync(
         self,
-        character_id: str,
+        file_path: str,
         *,
-        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-    ) -> bytes:
-        """Download a character model in the requested format (sync)."""
-        ext = output_format.lower()
-        url = f"{self._parent.base_url}/motion/bundle/{character_id}/character.{ext}"
-        response = self._parent.session.get(url)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return response.content
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+    ):
+        """Upload and optionally auto-rig a 3D character model (sync)."""
+        return asyncio.run(self.create(file_path, auto_rig=auto_rig, front_facing=front_facing))
+
+    async def list(self) -> list[Character]:
+        """List all characters for the authenticated user."""
+        return await self._client._graphql(
+            q.LIST_CHARACTERS,
+            path="characters",
+            path_default=[],
+            return_type=list[Character],
+        )
+
+    def list_sync(self):
+        """List all characters for the authenticated user (sync)."""
+        return asyncio.run(self.list())
 
     async def download(
         self,
@@ -117,49 +77,20 @@ class CharactersModule(_BaseModule):
     ) -> bytes:
         """Download a character model in the requested format."""
         ext = output_format.lower()
-        url = f"{self._parent.base_url}/motion/bundle/{character_id}/character.{ext}"
-        response = await self._parent.async_client.get(url)
+        url = f"{self._client.base_url}/motion/bundle/{character_id}/character.{ext}"
+        response = await self._client.async_client.get(url)
         if not response.is_success:
             raise UthanaError(response.status_code, response.text)
         return response.content
 
-    def download_preview_sync(self, character_id: str, motion_id: str) -> bytes:
-        """Download motion preview WebM (does not charge download seconds) (sync)."""
-        url = f"{self._parent.base_url}/app/preview/{character_id}/{motion_id}/preview.webm"
-        response = self._parent.session.get(url, timeout=60.0)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return response.content
-
-    async def download_preview(self, character_id: str, motion_id: str) -> bytes:
-        """Download motion preview WebM (does not charge download seconds)."""
-        url = f"{self._parent.base_url}/app/preview/{character_id}/{motion_id}/preview.webm"
-        response = await self._parent.async_client.get(url, timeout=60.0)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return response.content
-
-    def create_from_gltf_sync(
+    def download_sync(
         self,
-        gltf_content: str,
-        motion_name: str,
+        character_id: str,
         *,
-        character_id: str | None = None,
-    ) -> MotionOutput:
-        """Upload GLTF content as a new motion (sync). Returns motion_id and character_id."""
-        char_id = character_id or UthanaCharacters.tar
-        variables = {
-            "gltf": gltf_content,
-            "motionName": motion_name,
-            "characterId": char_id,
-        }
-        data = self._parent._graphql_sync(q.CREATE_MOTION_FROM_GLTF, variables)
-        gltf_data = data.get("create_motion_from_gltf", {})
-        motion = gltf_data.get("motion") or {}
-        motion_id = motion.get("id")
-        if not motion_id:
-            raise UthanaError(400, "create_motion_from_gltf did not return motion id")
-        return MotionOutput(character_id=char_id, motion_id=motion_id)
+        output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+    ):
+        """Download a character model in the requested format (sync)."""
+        return asyncio.run(self.download(character_id, output_format=output_format))
 
     async def create_from_gltf(
         self,
@@ -167,7 +98,7 @@ class CharactersModule(_BaseModule):
         motion_name: str,
         *,
         character_id: str | None = None,
-    ) -> MotionOutput:
+    ) -> TextToMotionResult:
         """Upload GLTF content as a new motion. Returns motion_id and character_id."""
         char_id = character_id or UthanaCharacters.tar
         variables = {
@@ -175,10 +106,24 @@ class CharactersModule(_BaseModule):
             "motionName": motion_name,
             "characterId": char_id,
         }
-        data = await self._parent._graphql(q.CREATE_MOTION_FROM_GLTF, variables)
-        gltf_data = data.get("create_motion_from_gltf", {})
+        gltf_data = await self._client._graphql(
+            q.CREATE_MOTION_FROM_GLTF, variables, path="create_motion_from_gltf"
+        )
+        gltf_data = gltf_data or {}
         motion = gltf_data.get("motion") or {}
         motion_id = motion.get("id")
         if not motion_id:
             raise UthanaError(400, "create_motion_from_gltf did not return motion id")
-        return MotionOutput(character_id=char_id, motion_id=motion_id)
+        return TextToMotionResult(character_id=char_id, motion_id=motion_id)
+
+    def create_from_gltf_sync(
+        self,
+        gltf_content: str,
+        motion_name: str,
+        *,
+        character_id: str | None = None,
+    ):
+        """Upload GLTF content as a new motion (sync). Returns motion_id and character_id."""
+        return asyncio.run(
+            self.create_from_gltf(gltf_content, motion_name, character_id=character_id)
+        )

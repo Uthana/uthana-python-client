@@ -111,11 +111,11 @@ uthana_client = Uthana("your-api-key")
 
 async def video_to_motion():
     job = await uthana_client.vtm.create("path/to/dance.mp4", motion_name="my_dance")
-    while job.status not in ("FINISHED", "FAILED"):
+    while job["status"] not in ("FINISHED", "FAILED"):
         await asyncio.sleep(5)  # Non-blocking; other tasks can run while waiting
-        job = await uthana_client.jobs.get(job.job_id)
-    if job.status == "FINISHED":
-        motion_id = job.result["result"]["id"]
+        job = await uthana_client.jobs.get(job["id"])
+    if job["status"] == "FINISHED":
+        motion_id = job["result"]["result"]["id"]
         data = await uthana_client.motions.download(
             UthanaCharacters.tar, motion_id, output_format="glb", fps=30
         )
@@ -152,10 +152,10 @@ async def manage_characters():
 
     # List all characters
     for c in await uthana_client.characters.list():
-        print(c.id, c.name)
+        print(c.get("id"), c.get("name"))
 
     # Download motion preview (WebM, does not charge download seconds)
-    preview_bytes = await uthana_client.characters.download_preview(
+    preview_bytes = await uthana_client.motions.download_preview(
         character_id, motion_id
     )
     with open("preview.webm", "wb") as f:
@@ -181,7 +181,7 @@ uthana_client = Uthana("your-api-key")
 async def manage_motions():
     # List all motions
     for m in await uthana_client.motions.list():
-        print(m.id, m.name)
+        print(m.get("id"), m.get("name"))
 
     # Download a motion
     data = await uthana_client.motions.download(
@@ -220,11 +220,11 @@ uthana_client = Uthana("your-api-key")
 
 async def get_org_info():
     user = await uthana_client.org.get_user()
-    print(user.id, user.name, user.email)
+    print(user.get("id"), user.get("name"), user.get("email"))
 
     org = await uthana_client.org.get_org()
-    print(org.name)
-    print(org.motion_download_secs_per_month_remaining, "seconds remaining")
+    print(org.get("name"))
+    print(org.get("motion_download_secs_per_month_remaining"), "seconds remaining")
 
 
 asyncio.run(get_org_info())
@@ -245,8 +245,8 @@ uthana_client = Uthana("your-api-key")
 
 async def poll_job():
     job = await uthana_client.jobs.get("job-id")
-    print(job.status)   # RESERVED, READY, FINISHED, FAILED
-    print(job.result)   # Result payload when FINISHED
+    print(job["status"])   # RESERVED, READY, FINISHED, FAILED
+    print(job["result"])   # Result payload when FINISHED
 
 
 asyncio.run(poll_job())

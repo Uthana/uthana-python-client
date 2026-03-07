@@ -5,25 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
-
-class UpdateMotionResult(TypedDict, total=False):
-    """Result of update_motion (delete/rename)."""
-
-    id: str
-    name: str | None
-    deleted: str | None
-
-
-class VideoToMotionResultPayload(TypedDict, total=False):
-    """Inner payload of video-to-motion job result. Motion id at result['result']['id']."""
-
-    id: str
-
-
-class VideoToMotionJobResult(TypedDict, total=False):
-    """Job result for video-to-motion. Motion id at result['result']['id']."""
-
-    result: VideoToMotionResultPayload
+# -----------------------------------------------------------------------------
+# Exceptions
+# -----------------------------------------------------------------------------
 
 
 class Error(Exception):
@@ -41,38 +25,13 @@ class UthanaError(Error):
         super().__init__(f"Uthana API error {status_code}: {message}")
 
 
-@dataclass
-class MotionOutput:
-    """Result of a text-to-motion or create-from-gltf request."""
-
-    character_id: str
-    motion_id: str
+# -----------------------------------------------------------------------------
+# Entity types (from queries: get, list)
+# -----------------------------------------------------------------------------
 
 
-@dataclass
-class JobOutput:
-    """Result of an async job (e.g. video-to-motion). Poll until status is FINISHED or FAILED.
-
-    For video-to-motion, motion id is at result['result']['id'] when status is FINISHED.
-    """
-
-    job_id: str
-    status: str
-    result: dict | None = None  # Polymorphic by job type; see VideoToMotionJobResult for VTM
-
-
-@dataclass
-class CharacterOutput:
-    """Result of a character upload. Includes download URL and auto-rig confidence (0–1)."""
-
-    url: str
-    character_id: str
-    auto_rig_confidence: float | None = None
-
-
-@dataclass
-class UserInfo:
-    """Current authenticated user."""
+class User(TypedDict, total=False):
+    """User object from org.get_user."""
 
     id: str
     name: str | None
@@ -80,9 +39,8 @@ class UserInfo:
     email_verified: bool | None
 
 
-@dataclass
-class OrgInfo:
-    """Organization info including motion download quota."""
+class Org(TypedDict, total=False):
+    """Org object from org.get_org."""
 
     id: str
     name: str | None
@@ -90,23 +48,93 @@ class OrgInfo:
     motion_download_secs_per_month_remaining: float | None
 
 
-@dataclass
-class MotionInfo:
-    """Motion metadata from list_motions."""
-
-    id: str
-    name: str | None
-    created: str | None
-
-
-@dataclass
-class CharacterInfo:
-    """Character metadata from list_characters."""
+class Character(TypedDict, total=False):
+    """Character object from characters.list."""
 
     id: str
     name: str | None
     created: str | None
     updated: str | None
+
+
+class Motion(TypedDict, total=False):
+    """Motion object from motions.list or update_motion (delete/rename)."""
+
+    id: str
+    name: str | None
+    created: str | None
+    deleted: str | None
+
+
+class Job(TypedDict, total=False):
+    """Job object from jobs.get, jobs.list, or vtm.create. Poll until status is FINISHED or FAILED.
+
+    For video-to-motion, motion id is at result['result']['id'] when status is FINISHED.
+    """
+
+    id: str
+    status: str
+    method: str | None
+    created: str | None
+    updated: str | None
+    result: dict | None
+
+
+# -----------------------------------------------------------------------------
+# Mutation result types
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class TextToMotionResult:
+    """Result of ttm.create or characters.create_from_gltf mutation."""
+
+    character_id: str
+    motion_id: str
+
+
+@dataclass
+class CreateCharacterResult:
+    """Result of characters.create mutation."""
+
+    url: str
+    character_id: str
+    auto_rig_confidence: float | None = None
+
+
+# Alias for vtm.create return type
+VideoToMotionResult = Job
+
+
+# -----------------------------------------------------------------------------
+# Constants and literals
+# -----------------------------------------------------------------------------
+
+
+TtmModelType = Literal["vqvae-v1", "diffusion-v2"]
+VtmModelType = Literal["video-to-motion-v1", "video-to-motion-v2"]
+ModelType = Literal["auto"] | TtmModelType | VtmModelType
+OutputFormat = Literal["glb", "fbx"]
+
+DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
+DEFAULT_TIMEOUT = 120.0
+SUPPORTED_VIDEO_FORMATS = frozenset({".mp4", ".mov", ".avi"})
+
+
+@dataclass(frozen=True)
+class UthanaCharacters:
+    """Pre-built character IDs. Use these without uploading your own character."""
+
+    tar: str = "cXi2eAP19XwQ"
+    ava: str = "cmEE2fT4aSaC"
+    manny: str = "c43tbGks3crJ"
+    quinn: str = "czCjWEMtWxt8"
+    y_bot: str = "cJM4ngRqXg83"
+
+
+# -----------------------------------------------------------------------------
+# Utilities
+# -----------------------------------------------------------------------------
 
 
 def detect_mesh_format(filepath: str) -> str | None:
@@ -121,23 +149,3 @@ def detect_mesh_format(filepath: str) -> str | None:
     if header.startswith(b"; FBX"):
         return "fbx"
     return None
-
-
-ModelType = Literal["auto", "vqvae-v1", "diffusion-v2"]
-OutputFormat = Literal["glb", "fbx"]
-
-
-@dataclass(frozen=True)
-class UthanaCharacters:
-    """Pre-built character IDs. Use these without uploading your own character."""
-
-    tar: str = "cXi2eAP19XwQ"
-    ava: str = "cmEE2fT4aSaC"
-    manny: str = "c43tbGks3crJ"
-    quinn: str = "czCjWEMtWxt8"
-    y_bot: str = "cJM4ngRqXg83"
-
-
-DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
-DEFAULT_TIMEOUT = 120.0
-SUPPORTED_VIDEO_FORMATS = frozenset({".mp4", ".mov", ".avi"})

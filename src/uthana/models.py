@@ -6,12 +6,17 @@ from __future__ import annotations
 
 import configparser
 from importlib.resources import files
+from typing import Generic, TypeVar, cast
+
+from .types import TtmModelType, VtmModelType
+
+_T = TypeVar("_T", bound=str)
 
 
-class _Capability:
+class _Capability(Generic[_T]):
     """Typed capability: default model + list of available models."""
 
-    def __init__(self, default: str, models: tuple[str, ...]) -> None:
+    def __init__(self, default: _T, models: tuple[str, ...]) -> None:
         self.default = default
         self.models = models
 
@@ -19,33 +24,34 @@ class _Capability:
 class _Models:
     """Typed access to models.ini: models.ttm.default, models.vtm.default."""
 
-    ttm: _Capability
-    vtm: _Capability
+    ttm: _Capability[TtmModelType]
+    vtm: _Capability[VtmModelType]
 
     def __init__(self) -> None:
-        ttm_default = "vqvae-v1"
-        vtm_default = "video-to-motion-v1"
-        ttm_models = ("vqvae-v1", "diffusion-v2", "flow-matching-v1", "nearest-neighbor-v1")
-        vtm_models = ("video-to-motion-v1", "video-to-motion-v2")
-
         try:
             config = configparser.ConfigParser()
-            path = files("uthana") / "models.ini"
-            with path.open() as f:
+            with (files("uthana") / "models.ini").open() as f:
                 config.read_file(f)
-            if config.has_section("ttm"):
-                ttm_default = config.get("ttm", "default", fallback=ttm_default)
-                if config.has_option("ttm", "models"):
-                    ttm_models = tuple(m.strip() for m in config.get("ttm", "models").split(","))
-            if config.has_section("vtm"):
-                vtm_default = config.get("vtm", "default", fallback=vtm_default)
-                if config.has_option("vtm", "models"):
-                    vtm_models = tuple(m.strip() for m in config.get("vtm", "models").split(","))
-        except Exception:
-            pass
+        except Exception as e:
+            raise Exception("Failed to load Uthana model configuration from models.ini") from e
 
-        self.ttm = _Capability(ttm_default, ttm_models)
-        self.vtm = _Capability(vtm_default, vtm_models)
+        def _get(section: str, key: str, fallback: str) -> str:
+            if not config.has_section(section):
+                return fallback
+            return config.get(section, key, fallback=fallback)
+
+        def _models(section: str, fallback: str) -> tuple[str, ...]:
+            raw = _get(section, "models", fallback)
+            return tuple(m.strip() for m in raw.split(","))
+
+        self.ttm = _Capability(
+            cast(TtmModelType, _get("ttm", "default", "vqvae-v1")),
+            _models("ttm", "vqvae-v1, diffusion-v2, flow-matching-v1, nearest-neighbor-v1"),
+        )
+        self.vtm = _Capability(
+            cast(VtmModelType, _get("vtm", "default", "video-to-motion-v1")),
+            _models("vtm", "video-to-motion-v1, video-to-motion-v2"),
+        )
 
 
 models = _Models()

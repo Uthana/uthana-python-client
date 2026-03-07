@@ -4,44 +4,41 @@
 
 from __future__ import annotations
 
-import json
+import asyncio
 
 from ..graphql import q
-from ..types import JobOutput
+from ..types import Job
 from ._base import _BaseModule
 
 
 class JobsModule(_BaseModule):
     """Async job polling for video to motion and other long-running operations."""
 
-    def get_sync(self, job_id: str) -> JobOutput:
-        """Get the status and result of an async job (sync)."""
-        data = self._parent._graphql_sync(q.GET_JOB, {"job_id": job_id})
-        job = data["job"]
-        result = job.get("result")
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except json.JSONDecodeError:
-                pass
-        return JobOutput(
-            job_id=job["id"],
-            status=job["status"],
-            result=result,
+    async def list(self, method: str | None = None) -> list[Job]:
+        """List jobs, optionally filtered by method (e.g. 'VideoToMotion')."""
+        variables = {} if method is None else {"method": method}
+        return await self._client._graphql(
+            q.LIST_JOBS,
+            variables,
+            path="jobs",
+            path_default=[],
+            return_type=list[Job],
         )
 
-    async def get(self, job_id: str) -> JobOutput:
+    def list_sync(self, method: str | None = None):
+        """List jobs, optionally filtered by method (sync)."""
+        return asyncio.run(self.list(method=method))
+
+    async def get(self, job_id: str) -> Job:
         """Get the status and result of an async job."""
-        data = await self._parent._graphql(q.GET_JOB, {"job_id": job_id})
-        job = data["job"]
-        result = job.get("result")
-        if isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except json.JSONDecodeError:
-                pass
-        return JobOutput(
-            job_id=job["id"],
-            status=job["status"],
-            result=result,
+        return await self._client._graphql(
+            q.GET_JOB,
+            {"job_id": job_id},
+            path="job",
+            path_default={},
+            return_type=Job,
         )
+
+    def get_sync(self, job_id: str) -> Job:
+        """Get the status and result of an async job (sync)."""
+        return asyncio.run(self.get(job_id))

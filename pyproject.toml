@@ -15,7 +15,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-uthana = ["models.ini"]
+uthana = ["models.ini", "py.typed"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -51,14 +51,10 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src", "scripts"]
+files = ["src", "scripts", "tests"]
 warn_unused_configs = true
 warn_return_any = true
 check_untyped_defs = true
 disallow_untyped_defs = false
 ignore_missing_imports = false
 pretty = true
-
-[[tool.mypy.overrides]]
-module = ["httpx"]
-ignore_missing_imports = true

@@ -7,20 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from uthana import JobOutput, Uthana, UthanaCharacters
+from uthana import Job, Uthana, UthanaCharacters
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 
-API_KEY = os.environ.get("UTHANA_API_KEY", "xxx")
-requires_api_key = pytest.mark.skipif(not API_KEY, reason="UTHANA_API_KEY not set")
+API_KEY = os.environ.get("UTHANA_API_KEY", "")
+requires_api_key = pytest.mark.skipif(
+    not API_KEY or API_KEY == "xxx", reason="UTHANA_API_KEY not set"
+)
 
 USE_DOMAIN = os.environ.get("UTHANA_DOMAIN")  # e.g. set for non-production
 
 
 @pytest.fixture(scope="module")
 def client() -> Uthana:
-    if not API_KEY:
+    if not API_KEY or API_KEY == "xxx":
         pytest.skip("UTHANA_API_KEY not set")
     return Uthana(API_KEY, domain=USE_DOMAIN)
 
@@ -158,13 +160,11 @@ async def test_create_character_fbx_async(client: Uthana) -> None:
     (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)
 
 
-def _poll_job(
-    client: Uthana, job_id: str, timeout: float = 900.0, interval: float = 2.0
-) -> JobOutput:
+def _poll_job(client: Uthana, job_id: str, timeout: float = 900.0, interval: float = 2.0) -> Job:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         job = client.jobs.get_sync(job_id)
-        if job.status in ("FINISHED", "FAILED"):
+        if job["status"] in ("FINISHED", "FAILED"):
             return job
         time.sleep(interval)
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
@@ -172,11 +172,11 @@ def _poll_job(
 
 async def _apoll_job(
     client: Uthana, job_id: str, timeout: float = 900.0, interval: float = 2.0
-) -> JobOutput:
+) -> Job:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         job = await client.jobs.get(job_id)
-        if job.status in ("FINISHED", "FAILED"):
+        if job["status"] in ("FINISHED", "FAILED"):
             return job
         await asyncio.sleep(interval)
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
@@ -186,13 +186,15 @@ async def _apoll_job(
 def test_create_video_to_motion(client: Uthana) -> None:
     job_output = client.vtm.create_sync(str(FIXTURES_DIR / "dance.mp4"))
 
-    assert job_output.job_id
-    assert job_output.status
+    assert job_output["id"]
+    assert job_output["status"]
 
-    job_output = _poll_job(client, job_output.job_id)
-    assert job_output.status == "FINISHED"
+    job_output = _poll_job(client, job_output["id"])
+    assert job_output["status"] == "FINISHED"
 
-    motion_id = job_output.result["result"]["id"]
+    result = job_output.get("result")
+    assert result is not None
+    motion_id = result["result"]["id"]
     assert motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
@@ -207,13 +209,15 @@ def test_create_video_to_motion(client: Uthana) -> None:
 async def test_create_video_to_motion_async(client: Uthana) -> None:
     job_output = await client.vtm.create(str(FIXTURES_DIR / "dance.mp4"))
 
-    assert job_output.job_id
-    assert job_output.status
+    assert job_output["id"]
+    assert job_output["status"]
 
-    job_output = await _apoll_job(client, job_output.job_id)
-    assert job_output.status == "FINISHED"
+    job_output = await _apoll_job(client, job_output["id"])
+    assert job_output["status"] == "FINISHED"
 
-    motion_id = job_output.result["result"]["id"]
+    result = job_output.get("result")
+    assert result is not None
+    motion_id = result["result"]["id"]
     assert motion_id
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
@@ -226,15 +230,15 @@ async def test_create_video_to_motion_async(client: Uthana) -> None:
 @requires_api_key
 def test_org_get_user(client: Uthana) -> None:
     user = client.org.get_user_sync()
-    assert user.id
-    assert user.name is not None or user.email is not None
+    assert user.get("id")
+    assert user.get("name") is not None or user.get("email") is not None
 
 
 @requires_api_key
 def test_org_get_org(client: Uthana) -> None:
     org = client.org.get_org_sync()
-    assert org.id
-    assert org.name is not None or org.motion_download_secs_per_month is not None
+    assert org.get("id")
+    assert org.get("name") is not None or org.get("motion_download_secs_per_month") is not None
 
 
 @requires_api_key
@@ -242,8 +246,8 @@ def test_characters_list(client: Uthana) -> None:
     characters = client.characters.list_sync()
     assert isinstance(characters, list)
     for c in characters:
-        assert c.id
-        assert hasattr(c, "name")
+        assert c.get("id")
+        assert "name" in c or "id" in c
 
 
 @requires_api_key
@@ -251,5 +255,5 @@ def test_motions_list(client: Uthana) -> None:
     motions = client.motions.list_sync()
     assert isinstance(motions, list)
     for m in motions:
-        assert m.id
-        assert hasattr(m, "name")
+        assert m.get("id")
+        assert "name" in m or "id" in m

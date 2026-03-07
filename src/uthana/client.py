@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from importlib.metadata import version as _pkg_version
+from typing import TypeVar, cast, overload
 
 import httpx
 
@@ -19,11 +20,13 @@ from .modules import (
 )
 from .types import (
     DEFAULT_TIMEOUT,
-    CharacterOutput,
+    CreateCharacterResult,
     ModelType,
     OutputFormat,
     UthanaError,
 )
+
+_T = TypeVar("_T")
 
 
 class Uthana:
@@ -78,7 +81,7 @@ class Uthana:
 
         anon_id = "00000000" + str(uuid.uuid1(clock_seq=1))[8:]
 
-        evt = {
+        evt: dict[str, str | None | dict[str, str]] = {
             "type": "track",
             "event": "initialized",
             "app": app,
@@ -89,23 +92,40 @@ class Uthana:
 
         r = self.session.post(f"{self.base_url}/event", json=evt, headers=headers)
         r.raise_for_status()
-        return r.json()
+        return cast(dict, r.json())
 
-    def _graphql_sync(self, query: str, variables: dict | None = None) -> dict:
-        """Execute a GraphQL query (sync)."""
-        response = self.session.post(
-            self.graphql_url,
-            json={"query": query, "variables": variables or {}},
-        )
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        result = response.json()
-        if "errors" in result:
-            raise UthanaError(400, f"GraphQL errors: {result['errors']}")
-        return result.get("data", {})
+    @overload
+    async def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        *,
+        path: str | None = None,
+        path_default: object = None,
+        return_type: None = None,
+    ) -> dict: ...
 
-    async def _graphql(self, query: str, variables: dict | None = None) -> dict:
-        """Execute a GraphQL query (async)."""
+    @overload
+    async def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        *,
+        path: str | None = None,
+        path_default: object = None,
+        return_type: type[_T],
+    ) -> _T: ...
+
+    async def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        *,
+        path: str | None = None,
+        path_default: object = None,
+        return_type: type[_T] | None = None,
+    ) -> dict | _T:
+        """Execute a GraphQL query (async). Optionally extract path and cast to return_type."""
         response = await self.async_client.post(
             self.graphql_url,
             json={"query": query, "variables": variables or {}},
@@ -115,7 +135,17 @@ class Uthana:
         result = response.json()
         if "errors" in result:
             raise UthanaError(400, f"GraphQL errors: {result['errors']}")
-        return result.get("data", {})
+        data = result.get("data", {})
+        if path is not None:
+            parts = path.split(".")
+            for key in parts[:-1]:
+                data = data.get(key, {})
+            data = data.get(parts[-1], path_default if path_default is not None else {})
+            if data is None and path_default is not None:
+                data = path_default
+        if return_type is not None:
+            return cast(_T, data)
+        return cast(dict, data)
 
     def _check_response(self, response: httpx.Response) -> dict:
         """Validate response and raise UthanaError on failure."""
@@ -124,7 +154,7 @@ class Uthana:
         result = response.json()
         if "errors" in result:
             raise UthanaError(400, f"GraphQL errors: {result['errors']}")
-        return result
+        return cast(dict, result)
 
     def _motion_url(
         self,
@@ -147,14 +177,14 @@ class Uthana:
             url += f"?{'&'.join(options)}"
         return url
 
-    def _build_character_output(self, *, result: dict, ext: str) -> CharacterOutput:
-        """Parse create_character response into CharacterOutput."""
+    def _build_character_output(self, *, result: dict, ext: str) -> CreateCharacterResult:
+        """Parse create_character response into CreateCharacterResult."""
         character = result["data"]["create_character"]["character"]
         character_id = character["id"]
         auto_rig_confidence = result["data"]["create_character"].get("auto_rig_confidence")
 
         url = f"{self.base_url}/motion/bundle/{character_id}/character.{ext}"
-        return CharacterOutput(
+        return CreateCharacterResult(
             url=url,
             character_id=character_id,
             auto_rig_confidence=auto_rig_confidence,
@@ -212,7 +242,7 @@ class Uthana:
     ) -> tuple[str, dict]:
         """Resolve model, build variables, and return mutation + variables for TTM."""
         if model == "auto":
-            model = models.ttm.default
+            model = cast(ModelType, models.ttm.default)
         if model == "vqvae-v1":
             variables = self._prepare_text_to_motion_vqvae_v1(
                 prompt=prompt, character_id=character_id, foot_ik=foot_ik

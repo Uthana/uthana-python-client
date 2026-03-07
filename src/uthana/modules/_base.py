@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class _BaseModule:
-    """Base for modules that delegate to the parent Uthana instance."""
+    """Base for modules that delegate to the Uthana client instance."""
 
-    def __init__(self, parent: Uthana) -> None:
-        self._parent = parent
+    def __init__(self, client: Uthana) -> None:
+        self._client = client
