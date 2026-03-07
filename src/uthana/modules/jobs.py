@@ -25,7 +25,7 @@ class JobsModule(_BaseModule):
             return_type=list[Job],
         )
 
-    def list_sync(self, method: str | None = None):
+    def list_sync(self, method: str | None = None) -> list[Job]:
         """List jobs, optionally filtered by method (sync)."""
         return asyncio.run(self.list(method=method))
 

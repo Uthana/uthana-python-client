@@ -8,6 +8,8 @@ import asyncio
 import json
 from typing import cast
 
+import httpx
+
 from ..graphql import q
 from ..models import models
 from ..types import VideoToMotionResult, VtmModelType
@@ -37,11 +39,14 @@ class VtmModule(_BaseModule):
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
-            response = await self._client.async_client.post(
-                self._client.graphql_url,
-                data={"operations": operations, "map": map_data},
-                files={"0": (filename, f, "application/octet-stream")},
-            )
+            async with httpx.AsyncClient(
+                auth=(self._client._api_key, ""), timeout=self._client._timeout
+            ) as http:
+                response = await http.post(
+                    self._client.graphql_url,
+                    data={"operations": operations, "map": map_data},
+                    files={"0": (filename, f, "application/octet-stream")},
+                )
 
         result = self._client._check_response(response)
         job = result["data"]["create_video_to_motion"]["job"]
@@ -53,6 +58,6 @@ class VtmModule(_BaseModule):
         *,
         motion_name: str | None = None,
         model: VtmModelType | None = None,
-    ):
+    ) -> VideoToMotionResult:
         """Extract motion capture from video (sync). Returns job to poll via jobs.get_sync()."""
         return asyncio.run(self.create(file_path, motion_name=motion_name, model=model))

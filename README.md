@@ -266,6 +266,16 @@ Pre-built characters you can use without uploading your own:
 | `UthanaCharacters.quinn` | czCjWEMtWxt8 |
 | `UthanaCharacters.y_bot` | cJM4ngRqXg83 |
 
+## Testing
+
+Integration tests (`tests/test_client.py`) require `UTHANA_API_KEY`. Use `.env.local` (gitignored) or env vars:
+
+```bash
+# .env.local
+UTHANA_API_KEY=your_key
+UTHANA_DOMAIN=custom.uthana.com  # optional, for non-production
+```
+
 ## Custom domain
 
 Use a different API host by passing `domain=`:

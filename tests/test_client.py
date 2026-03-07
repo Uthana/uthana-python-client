@@ -160,7 +160,7 @@ async def test_create_character_fbx_async(client: Uthana) -> None:
     (ARTIFACTS_DIR / "async_wrestler_rigged.fbx").write_bytes(data)
 
 
-def _poll_job(client: Uthana, job_id: str, timeout: float = 900.0, interval: float = 2.0) -> Job:
+def _poll_job(client: Uthana, job_id: str, timeout: float = 300.0, interval: float = 2.0) -> Job:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         job = client.jobs.get_sync(job_id)
@@ -171,7 +171,7 @@ def _poll_job(client: Uthana, job_id: str, timeout: float = 900.0, interval: flo
 
 
 async def _apoll_job(
-    client: Uthana, job_id: str, timeout: float = 900.0, interval: float = 2.0
+    client: Uthana, job_id: str, timeout: float = 300.0, interval: float = 2.0
 ) -> Job:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -183,6 +183,7 @@ async def _apoll_job(
 
 
 @requires_api_key
+@pytest.mark.timeout(300)
 def test_create_video_to_motion(client: Uthana) -> None:
     job_output = client.vtm.create_sync(str(FIXTURES_DIR / "dance.mp4"))
 
@@ -206,6 +207,7 @@ def test_create_video_to_motion(client: Uthana) -> None:
 
 @requires_api_key
 @pytest.mark.asyncio
+@pytest.mark.timeout(300)
 async def test_create_video_to_motion_async(client: Uthana) -> None:
     job_output = await client.vtm.create(str(FIXTURES_DIR / "dance.mp4"))
 

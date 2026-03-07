@@ -59,7 +59,7 @@ class TtmModule(_BaseModule):
         cfg_scale: float | None = None,
         seed: int | None = None,
         internal_ik: bool | None = None,
-    ):
+    ) -> TextToMotionResult:
         """Generate a 3D character animation from a natural language prompt (sync)."""
         return asyncio.run(
             self.create(

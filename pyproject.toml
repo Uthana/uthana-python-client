@@ -21,12 +21,17 @@ uthana = ["models.ini", "py.typed"]
 default-groups = ["dev"]
 
 [tool.pytest.ini_options]
-markers = ["smoke: subset of full tests"]
+markers = [
+    "smoke: subset of full tests",
+    "timeout: fail test if it exceeds the given number of seconds",
+]
 
 [dependency-groups]
 dev = [
+    "python-dotenv>=1.0.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.0.0",
+    "pytest-timeout>=2.0.0",
     "ruff>=0.12.0",
     "mypy>=1.11.0",
     "pre-commit>=3.8.0",

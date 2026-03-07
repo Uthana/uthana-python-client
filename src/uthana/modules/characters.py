@@ -7,6 +7,8 @@ from __future__ import annotations
 import asyncio
 import json
 
+import httpx
+
 from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
@@ -37,11 +39,14 @@ class CharactersModule(_BaseModule):
         map_data = json.dumps({"0": ["variables.file"]})
 
         with open(file_path, "rb") as f:
-            response = await self._client.async_client.post(
-                self._client.graphql_url,
-                data={"operations": operations, "map": map_data},
-                files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
-            )
+            async with httpx.AsyncClient(
+                auth=(self._client._api_key, ""), timeout=self._client._timeout
+            ) as http:
+                response = await http.post(
+                    self._client.graphql_url,
+                    data={"operations": operations, "map": map_data},
+                    files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
+                )
 
         result = self._client._check_response(response)
         return self._client._build_character_output(result=result, ext=ext)
@@ -52,7 +57,7 @@ class CharactersModule(_BaseModule):
         *,
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
-    ):
+    ) -> CreateCharacterResult:
         """Upload and optionally auto-rig a 3D character model (sync)."""
         return asyncio.run(self.create(file_path, auto_rig=auto_rig, front_facing=front_facing))
 
@@ -65,7 +70,7 @@ class CharactersModule(_BaseModule):
             return_type=list[Character],
         )
 
-    def list_sync(self):
+    def list_sync(self) -> list[Character]:
         """List all characters for the authenticated user (sync)."""
         return asyncio.run(self.list())
 
@@ -78,7 +83,10 @@ class CharactersModule(_BaseModule):
         """Download a character model in the requested format."""
         ext = output_format.lower()
         url = f"{self._client.base_url}/motion/bundle/{character_id}/character.{ext}"
-        response = await self._client.async_client.get(url)
+        async with httpx.AsyncClient(
+            auth=(self._client._api_key, ""), timeout=self._client._timeout
+        ) as http:
+            response = await http.get(url)
         if not response.is_success:
             raise UthanaError(response.status_code, response.text)
         return response.content
@@ -88,7 +96,7 @@ class CharactersModule(_BaseModule):
         character_id: str,
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
-    ):
+    ) -> bytes:
         """Download a character model in the requested format (sync)."""
         return asyncio.run(self.download(character_id, output_format=output_format))
 
@@ -122,7 +130,7 @@ class CharactersModule(_BaseModule):
         motion_name: str,
         *,
         character_id: str | None = None,
-    ):
+    ) -> TextToMotionResult:
         """Upload GLTF content as a new motion (sync). Returns motion_id and character_id."""
         return asyncio.run(
             self.create_from_gltf(gltf_content, motion_name, character_id=character_id)

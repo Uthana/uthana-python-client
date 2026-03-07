@@ -20,7 +20,7 @@ class OrgModule(_BaseModule):
             q.GET_USER, path="user", path_default={}, return_type=User
         )
 
-    def get_user_sync(self):
+    def get_user_sync(self) -> User:
         """Get current user information (sync)."""
         return asyncio.run(self.get_user())
 
@@ -28,6 +28,6 @@ class OrgModule(_BaseModule):
         """Get current organization information including quota."""
         return await self._client._graphql(q.GET_ORG, path="org", path_default={}, return_type=Org)
 
-    def get_org_sync(self):
+    def get_org_sync(self) -> Org:
         """Get current organization information including quota (sync)."""
         return asyncio.run(self.get_org())

@@ -57,8 +57,9 @@ class Uthana:
         domain = domain or "uthana.com"
         self.base_url = f"https://{domain}"
         self.graphql_url = f"{self.base_url}/graphql"
+        self._api_key = api_key
+        self._timeout = timeout
         self.session = httpx.Client(auth=(api_key, ""), timeout=timeout)
-        self.async_client = httpx.AsyncClient(auth=(api_key, ""), timeout=timeout)
         self._log_init()
 
         self.ttm = TtmModule(self)
@@ -125,11 +126,14 @@ class Uthana:
         path_default: object = None,
         return_type: type[_T] | None = None,
     ) -> dict | _T:
-        """Execute a GraphQL query (async). Optionally extract path and cast to return_type."""
-        response = await self.async_client.post(
-            self.graphql_url,
-            json={"query": query, "variables": variables or {}},
-        )
+        """Execute a GraphQL query (async). Creates a fresh AsyncClient per call so the
+        client is safe to reuse across multiple event loops (e.g. sequential async tests).
+        """
+        async with httpx.AsyncClient(auth=(self._api_key, ""), timeout=self._timeout) as client:
+            response = await client.post(
+                self.graphql_url,
+                json={"query": query, "variables": variables or {}},
+            )
         if not response.is_success:
             raise UthanaError(response.status_code, response.text)
         result = response.json()

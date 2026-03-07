@@ -7,6 +7,8 @@ from __future__ import annotations
 import asyncio
 from typing import cast
 
+import httpx
+
 from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
@@ -29,7 +31,7 @@ class MotionsModule(_BaseModule):
             return_type=list[Motion],
         )
 
-    def list_sync(self):
+    def list_sync(self) -> list[Motion]:
         """List all motions for the authenticated user (sync)."""
         return asyncio.run(self.list())
 
@@ -50,7 +52,10 @@ class MotionsModule(_BaseModule):
             fps=fps,
             no_mesh=no_mesh,
         )
-        response = await self._client.async_client.get(url)
+        async with httpx.AsyncClient(
+            auth=(self._client._api_key, ""), timeout=self._client._timeout
+        ) as http:
+            response = await http.get(url)
         if not response.is_success:
             raise UthanaError(response.status_code, response.text)
         return cast(bytes, response.content)
@@ -63,22 +68,21 @@ class MotionsModule(_BaseModule):
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
         fps: int | None = None,
         no_mesh: bool | None = None,
-    ):
+    ) -> bytes:
         """Download a motion animation file, retargeted to the given character (sync)."""
         return asyncio.run(
             self.download(
-                character_id,
-                motion_id,
-                output_format=output_format,
-                fps=fps,
-                no_mesh=no_mesh,
+                character_id, motion_id, output_format=output_format, fps=fps, no_mesh=no_mesh
             )
         )
 
     async def download_preview(self, character_id: str, motion_id: str) -> bytes:
         """Download motion preview WebM (does not charge download seconds)."""
         url = f"{self._client.base_url}/app/preview/{character_id}/{motion_id}/preview.webm"
-        response = await self._client.async_client.get(url, timeout=60.0)
+        async with httpx.AsyncClient(
+            auth=(self._client._api_key, ""), timeout=self._client._timeout
+        ) as http:
+            response = await http.get(url, timeout=60.0)
         if not response.is_success:
             raise UthanaError(response.status_code, response.text)
         return cast(bytes, response.content)
