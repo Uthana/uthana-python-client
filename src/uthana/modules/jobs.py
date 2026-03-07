@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import List
 
 from ..graphql import q
 from ..types import Job
@@ -25,7 +26,7 @@ class JobsModule(_BaseModule):
             return_type=list[Job],
         )
 
-    def list_sync(self, method: str | None = None) -> list[Job]:
+    def list_sync(self, method: str | None = None) -> List[Job]:
         """List jobs, optionally filtered by method (sync)."""
         return asyncio.run(self.list(method=method))
 

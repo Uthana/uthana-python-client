@@ -25,7 +25,7 @@ class TtmModule(_BaseModule):
         cfg_scale: float | None = None,
         seed: int | None = None,
         internal_ik: bool | None = None,
-    ):
+    ) -> TextToMotionResult:
         """Generate a 3D character animation from a natural language prompt.
 
         Model defaults to the value in models.ini when omitted or set to \"auto\".
@@ -71,5 +71,5 @@ class TtmModule(_BaseModule):
                 cfg_scale=cfg_scale,
                 seed=seed,
                 internal_ik=internal_ik,
-            )
+            ),
         )

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import List
 
 import httpx
 
@@ -70,7 +71,7 @@ class CharactersModule(_BaseModule):
             return_type=list[Character],
         )
 
-    def list_sync(self) -> list[Character]:
+    def list_sync(self) -> List[Character]:
         """List all characters for the authenticated user (sync)."""
         return asyncio.run(self.list())
 

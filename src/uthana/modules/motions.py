@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import cast
+from typing import List, cast
 
 import httpx
 
@@ -31,7 +31,7 @@ class MotionsModule(_BaseModule):
             return_type=list[Motion],
         )
 
-    def list_sync(self) -> list[Motion]:
+    def list_sync(self) -> List[Motion]:
         """List all motions for the authenticated user (sync)."""
         return asyncio.run(self.list())
 
