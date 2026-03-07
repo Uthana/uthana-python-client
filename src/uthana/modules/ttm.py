@@ -11,7 +11,7 @@ from ..types import TextToMotionResult, TtmModelType, UthanaCharacters
 from ._base import _BaseModule
 
 
-class TTMModule(_BaseModule):
+class TtmModule(_BaseModule):
     """Text to motion: generate animations from natural language prompts."""
 
     async def create(

@@ -15,8 +15,8 @@ from .modules import (
     JobsModule,
     MotionsModule,
     OrgModule,
-    TTMModule,
-    VTMModule,
+    TtmModule,
+    VtmModule,
 )
 from .types import (
     DEFAULT_TIMEOUT,
@@ -61,8 +61,8 @@ class Uthana:
         self.async_client = httpx.AsyncClient(auth=(api_key, ""), timeout=timeout)
         self._log_init()
 
-        self.ttm = TTMModule(self)
-        self.vtm = VTMModule(self)
+        self.ttm = TtmModule(self)
+        self.vtm = VtmModule(self)
         self.characters = CharactersModule(self)
         self.motions = MotionsModule(self)
         self.org = OrgModule(self)
@@ -240,7 +240,7 @@ class Uthana:
         seed: int | None,
         internal_ik: bool | None,
     ) -> tuple[str, dict]:
-        """Resolve model, build variables, and return mutation + variables for TTM."""
+        """Resolve model, build variables, and return mutation + variables for Ttm."""
         if model == "auto":
             model = cast(ModelType, models.ttm.default)
         if model == "vqvae-v1":

@@ -116,12 +116,12 @@ def test_motion_url(
 
 
 def test_models_ttm_default() -> None:
-    """Default TTM model is loaded from models.ini."""
+    """Default Ttm model is loaded from models.ini."""
     assert models.ttm.default in models.ttm.models
 
 
 def test_models_vtm_default() -> None:
-    """Default VTM model is loaded from models.ini."""
+    """Default Vtm model is loaded from models.ini."""
     assert models.vtm.default in models.vtm.models
 
 

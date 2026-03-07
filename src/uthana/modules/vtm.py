@@ -15,7 +15,7 @@ from ..utils import prepare_video_to_motion
 from ._base import _BaseModule
 
 
-class VTMModule(_BaseModule):
+class VtmModule(_BaseModule):
     """Video to motion: extract motion capture from video files."""
 
     async def create(
