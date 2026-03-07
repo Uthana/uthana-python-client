@@ -259,3 +259,21 @@ def test_motions_list(client: Uthana) -> None:
     for m in motions:
         assert m.get("id")
         assert "name" in m or "id" in m
+
+
+@requires_api_key
+def test_jobs_list(client: Uthana) -> None:
+    jobs = client.jobs.list_sync()
+    assert isinstance(jobs, list)
+    for j in jobs:
+        assert j.get("id")
+        assert j.get("status")
+
+
+@requires_api_key
+def test_jobs_list_filtered_by_method(client: Uthana) -> None:
+    jobs = client.jobs.list_sync(method="VideoToMotion")
+    assert isinstance(jobs, list)
+    for j in jobs:
+        assert j.get("id")
+        assert j.get("method") == "VideoToMotion"
