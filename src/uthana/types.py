@@ -87,7 +87,7 @@ class Job(TypedDict, total=False):
 
 @dataclass
 class TextToMotionResult:
-    """Result of ttm.create or characters.create_from_gltf mutation."""
+    """Result of ttm.create or motions.bake_with_changes mutation."""
 
     character_id: str
     motion_id: str
@@ -99,6 +99,30 @@ class CreateCharacterResult:
 
     url: str
     character_id: str
+    auto_rig_confidence: float | None = None
+
+
+@dataclass
+class GenerateFromTextResult:
+    """Result of characters.generate_from_text. Contains previews to choose from."""
+
+    character_id: str
+    images: list
+
+
+@dataclass
+class GenerateFromImageResult:
+    """Result of characters.generate_from_image. Contains the single generated preview."""
+
+    character_id: str
+    image: dict
+
+
+@dataclass
+class CreateFromGeneratedImageResult:
+    """Result of characters.create_from_generated_image, create_from_text, or create_from_image."""
+
+    character: dict
     auto_rig_confidence: float | None = None
 
 

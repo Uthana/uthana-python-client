@@ -1,6 +1,6 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
-"""Motion management: list, download, delete, rename, favorite."""
+"""Motion management: list, download, delete, rename, favorite, bake."""
 
 from __future__ import annotations
 
@@ -14,13 +14,15 @@ from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
     OutputFormat,
+    TextToMotionResult,
+    UthanaCharacters,
     UthanaError,
 )
 from ._base import _BaseModule
 
 
 class MotionsModule(_BaseModule):
-    """Motion management: list, download, delete, rename, favorite."""
+    """Motion management: list, download, delete, rename, favorite, bake."""
 
     async def list(self) -> list[Motion]:
         """List all motions for the authenticated user."""
@@ -76,7 +78,7 @@ class MotionsModule(_BaseModule):
             )
         )
 
-    async def download_preview(self, character_id: str, motion_id: str) -> bytes:
+    async def preview(self, character_id: str, motion_id: str) -> bytes:
         """Download motion preview WebM (does not charge download seconds)."""
         url = f"{self._client.base_url}/app/preview/{character_id}/{motion_id}/preview.webm"
         async with httpx.AsyncClient(
@@ -87,11 +89,11 @@ class MotionsModule(_BaseModule):
             raise UthanaError(response.status_code, response.text)
         return cast(bytes, response.content)
 
-    def download_preview_sync(self, character_id: str, motion_id: str) -> bytes:
+    def preview_sync(self, character_id: str, motion_id: str) -> bytes:
         """Download motion preview WebM (does not charge download seconds) (sync)."""
-        return asyncio.run(self.download_preview(character_id, motion_id))
+        return asyncio.run(self.preview(character_id, motion_id))
 
-    async def delete(self, motion_id: str):
+    async def delete(self, motion_id: str) -> Motion:
         """Soft-delete a motion by ID."""
         return await self._client._graphql(
             q.UPDATE_MOTION,
@@ -100,7 +102,7 @@ class MotionsModule(_BaseModule):
             return_type=Motion,
         )
 
-    def delete_sync(self, motion_id: str):
+    def delete_sync(self, motion_id: str) -> Motion:
         """Soft-delete a motion by ID (sync)."""
         return asyncio.run(self.delete(motion_id))
 
@@ -113,7 +115,7 @@ class MotionsModule(_BaseModule):
             return_type=Motion,
         )
 
-    def rename_sync(self, motion_id: str, new_name: str):
+    def rename_sync(self, motion_id: str, new_name: str) -> Motion:
         """Rename a motion by ID (sync)."""
         return asyncio.run(self.rename(motion_id, new_name))
 
@@ -124,6 +126,46 @@ class MotionsModule(_BaseModule):
         else:
             await self._client._graphql(q.DELETE_MOTION_FAVORITE, {"motion_id": motion_id})
 
-    def favorite_sync(self, motion_id: str, favorite: bool):
+    def favorite_sync(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite (sync)."""
-        return asyncio.run(self.favorite(motion_id, favorite))
+        asyncio.run(self.favorite(motion_id, favorite))
+
+    async def bake_with_changes(
+        self,
+        gltf_content: str,
+        motion_name: str,
+        *,
+        character_id: str | None = None,
+    ) -> TextToMotionResult:
+        """Bake GLTF content as a new motion for an existing character.
+
+        Use this to submit custom or edited GLTF animation data to the platform.
+        Returns the resulting motion_id and character_id.
+        """
+        char_id = character_id or UthanaCharacters.tar
+        variables = {
+            "gltf": gltf_content,
+            "motionName": motion_name,
+            "characterId": char_id,
+        }
+        data = await self._client._graphql(
+            q.CREATE_MOTION_FROM_GLTF, variables, path="create_motion_from_gltf"
+        )
+        data = data or {}
+        motion = data.get("motion") or {}
+        motion_id = motion.get("id")
+        if not motion_id:
+            raise UthanaError(400, "create_motion_from_gltf did not return motion id")
+        return TextToMotionResult(character_id=char_id, motion_id=motion_id)
+
+    def bake_with_changes_sync(
+        self,
+        gltf_content: str,
+        motion_name: str,
+        *,
+        character_id: str | None = None,
+    ) -> TextToMotionResult:
+        """Bake GLTF content as a new motion for an existing character (sync)."""
+        return asyncio.run(
+            self.bake_with_changes(gltf_content, motion_name, character_id=character_id)
+        )

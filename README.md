@@ -5,6 +5,8 @@
 
 A Python client for Uthana: generate lifelike human motion from text or 2D video, create and auto-rig characters, and manage your motions.
 
+📖 [Full API documentation](https://uthana.com/docs/api) · 🤖 [Context7 page](https://context7.com/websites/uthana_api)
+
 ## Install
 
 ```bash
@@ -130,7 +132,7 @@ asyncio.run(video_to_motion())
 
 [Docs: Auto-rig / add a character](https://uthana.com/docs/api/capabilities/auto-rig-and-add-character) · [Download a character](https://uthana.com/docs/api/capabilities/downloading-character)
 
-Upload, list, and download characters. Supports auto-rigging for humanoid meshes.
+Upload, list, and download characters. Supports auto-rigging for humanoid meshes, and generation from text prompts or image files.
 
 ```python
 import asyncio
@@ -140,7 +142,7 @@ uthana_client = Uthana("your-api-key")
 
 
 async def manage_characters():
-    # Upload and auto-rig a character
+    # Upload and auto-rig a character from a file
     output = await uthana_client.characters.create("path/to/character.glb")
     print(output.character_id)
     print(output.auto_rig_confidence)  # 0–1.0, higher is better
@@ -154,12 +156,37 @@ async def manage_characters():
     for c in await uthana_client.characters.list():
         print(c.get("id"), c.get("name"))
 
-    # Download motion preview (WebM, does not charge download seconds)
-    preview_bytes = await uthana_client.motions.download_preview(
-        character_id, motion_id
+    # Text-to-character: auto-pick first preview
+    result = await uthana_client.characters.create_from_text(
+        "a knight in shining armor",
+        name="Knight",
+        on_previews_ready=lambda previews: previews[0]["key"],
     )
-    with open("preview.webm", "wb") as f:
-        f.write(preview_bytes)
+    print(result.character.get("id"))
+
+    # Text-to-character: custom preview selection (e.g. show a UI and return the chosen key)
+    result = await uthana_client.characters.create_from_text(
+        "a futuristic soldier",
+        on_previews_ready=lambda previews: show_picker_ui(previews),
+    )
+
+    # Text-to-character: two-step (generate previews first, then confirm separately)
+    gen = await uthana_client.characters.generate_from_text("a futuristic soldier")
+    # gen.images is a list of {"key": ..., "url": ...} — show them to the user
+    chosen_key = gen.images[0]["key"]
+    result = await uthana_client.characters.create_from_generated_image(
+        gen.character_id, chosen_key, "a futuristic soldier", name="Soldier"
+    )
+
+    # Image-to-character: auto-confirms the single generated preview
+    result = await uthana_client.characters.create_from_image(
+        "path/to/reference.png",
+        prompt="a knight in armor",
+    )
+
+    # Rename or delete
+    await uthana_client.characters.rename(result.character["id"], "New name")
+    await uthana_client.characters.delete(result.character["id"])
 
 
 asyncio.run(manage_characters())
@@ -169,7 +196,7 @@ asyncio.run(manage_characters())
 
 [Docs: Asset management](https://uthana.com/docs/api/capabilities/asset-management) · [Retargeting](https://uthana.com/docs/api/capabilities/retargeting)
 
-List, download, delete, rename, and favorite motions.
+List, download, preview, delete, rename, favorite, and bake motions.
 
 ```python
 import asyncio
@@ -192,6 +219,11 @@ async def manage_motions():
         no_mesh=False,
     )
 
+    # Download motion preview WebM (does not charge download seconds)
+    preview_bytes = await uthana_client.motions.preview(character_id, motion_id)
+    with open("preview.webm", "wb") as f:
+        f.write(preview_bytes)
+
     # Rename a motion
     await uthana_client.motions.rename("motion-id", "New name")
 
@@ -200,6 +232,12 @@ async def manage_motions():
 
     # Favorite / unfavorite
     await uthana_client.motions.favorite("motion-id", True)
+
+    # Bake custom GLTF animation data as a new motion for an existing character
+    result = await uthana_client.motions.bake_with_changes(
+        gltf_content, "My motion", character_id=character_id
+    )
+    print(result.motion_id, result.character_id)
 
 
 asyncio.run(manage_motions())

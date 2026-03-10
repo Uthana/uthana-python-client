@@ -1,4 +1,14 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
+#
+# Integration tests against the real Uthana API.
+#
+# Required env:
+#   UTHANA_API_KEY   — skips entire suite when absent or set to "xxx"
+#   UTHANA_DOMAIN    — optional custom domain (defaults to uthana.com)
+#
+# Optional env:
+#   UTHANA_LONG_TESTS=true — enables long-running tests (vtm, character
+#                            generation from text). Skipped by default.
 
 import asyncio
 import os
@@ -15,6 +25,10 @@ ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
 API_KEY = os.environ.get("UTHANA_API_KEY", "")
 requires_api_key = pytest.mark.skipif(
     not API_KEY or API_KEY == "xxx", reason="UTHANA_API_KEY not set"
+)
+requires_long_tests = pytest.mark.skipif(
+    os.environ.get("UTHANA_LONG_TESTS") != "true",
+    reason="UTHANA_LONG_TESTS not set to 'true'",
 )
 
 USE_DOMAIN = os.environ.get("UTHANA_DOMAIN")  # e.g. set for non-production
@@ -183,6 +197,22 @@ async def _apoll_job(
 
 
 @requires_api_key
+@requires_long_tests
+@pytest.mark.asyncio
+async def test_characters_create_from_text(client: Uthana) -> None:
+    result = await client.characters.create_from_text(
+        "a futuristic soldier in heavy armor",
+        on_previews_ready=lambda previews: previews[0]["key"],
+    )
+    assert result.character.get("id")
+
+    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    data = await client.characters.download(result.character["id"], output_format="glb")
+    (ARTIFACTS_DIR / "created_from_text.glb").write_bytes(data)
+
+
+@requires_api_key
+@requires_long_tests
 @pytest.mark.timeout(300)
 def test_create_video_to_motion(client: Uthana) -> None:
     job_output = client.vtm.create_sync(str(FIXTURES_DIR / "dance.mp4"))
@@ -206,6 +236,7 @@ def test_create_video_to_motion(client: Uthana) -> None:
 
 
 @requires_api_key
+@requires_long_tests
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_create_video_to_motion_async(client: Uthana) -> None:

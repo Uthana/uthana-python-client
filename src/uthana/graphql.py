@@ -154,6 +154,52 @@ query {
 }
 """
 
+    CREATE_IMAGE_FROM_TEXT = """
+mutation CreateImageFromText($prompt: String!) {
+    create_image_from_text(prompt: $prompt) {
+        character_id
+        images {
+            key
+            url
+        }
+    }
+}
+"""
+
+    CREATE_IMAGE_FROM_IMAGE = """
+mutation CreateImageFromImage($file: Upload!) {
+    create_image_from_image(file: $file) {
+        character_id
+        image {
+            key
+            url
+        }
+    }
+}
+"""
+
+    CREATE_CHARACTER_FROM_IMAGE = """
+mutation CreateCharacterFromImage(
+    $character_id: String!,
+    $image_key: String!,
+    $prompt: String!,
+    $name: String
+) {
+    create_character_from_image(
+        character_id: $character_id,
+        image_key: $image_key,
+        prompt: $prompt,
+        name: $name
+    ) {
+        character {
+            id
+            name
+        }
+        auto_rig_confidence
+    }
+}
+"""
+
     CREATE_MOTION_FROM_GLTF = """
 mutation create_motion_from_gltf($gltf: String!, $motionName: String!, $characterId: String) {
     create_motion_from_gltf(gltf: $gltf, motion_name: $motionName, character_id: $characterId) {
