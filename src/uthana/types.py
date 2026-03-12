@@ -76,7 +76,8 @@ class Job(TypedDict, total=False):
     status: str
     method: str | None
     created: str | None
-    updated: str | None
+    started: str | None
+    ended: str | None
     result: dict | None
 
 
@@ -95,7 +96,7 @@ class TextToMotionResult:
 
 @dataclass
 class CreateCharacterResult:
-    """Result of characters.create mutation."""
+    """Result of characters.create(from_="file")."""
 
     url: str
     character_id: str
@@ -103,24 +104,19 @@ class CreateCharacterResult:
 
 
 @dataclass
-class GenerateFromTextResult:
-    """Result of characters.generate_from_text. Contains previews to choose from."""
+class CharacterPreviewResult:
+    """Intermediate result of characters.create(from_="prompt"|"image") when no on_previews_ready
+    callback is provided. Pass to characters.generate_from_image() to finalize the character."""
 
     character_id: str
-    images: list
-
-
-@dataclass
-class GenerateFromImageResult:
-    """Result of characters.generate_from_image. Contains the single generated preview."""
-
-    character_id: str
-    image: dict
+    previews: list
+    prompt: str
 
 
 @dataclass
 class CreateFromGeneratedImageResult:
-    """Result of characters.create_from_generated_image, create_from_text, or create_from_image."""
+    """Result of characters.create(from_="prompt"|"image", on_previews_ready=...)
+    or characters.generate_from_image()."""
 
     character: dict
     auto_rig_confidence: float | None = None

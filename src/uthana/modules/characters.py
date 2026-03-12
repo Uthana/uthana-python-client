@@ -1,13 +1,13 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
-"""Character management: upload, list, download, generate previews, and create from images."""
+"""Character management: upload, list, download, generate previews, rename, and delete."""
 
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
-from typing import Callable, List, Optional
+import os
+from typing import Callable, List, Literal, Optional, Union, overload
 
 import httpx
 
@@ -15,10 +15,9 @@ from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Character,
+    CharacterPreviewResult,
     CreateCharacterResult,
     CreateFromGeneratedImageResult,
-    GenerateFromImageResult,
-    GenerateFromTextResult,
     OutputFormat,
     UthanaError,
 )
@@ -27,42 +26,206 @@ from ._base import _BaseModule
 
 
 class CharactersModule(_BaseModule):
-    """Character management: upload, list, download, generate previews, and create from images."""
+    """Character management: upload, list, download, generate previews, rename, and delete."""
+
+    @overload
+    async def create(
+        self,
+        *,
+        method: Literal["file"] | None = None,
+        file: str,
+        prompt: None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+    ) -> CreateCharacterResult: ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        method: Literal["prompt"] | None = None,
+        prompt: str,
+        file: None = None,
+        name: str | None = None,
+        on_previews_ready: Callable,
+    ) -> CreateFromGeneratedImageResult: ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        method: Literal["prompt"] | None = None,
+        prompt: str,
+        file: None = None,
+        name: str | None = None,
+        on_previews_ready: None = None,
+    ) -> CharacterPreviewResult: ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        method: Literal["image"] | None = None,
+        file: str,
+        name: str | None = None,
+    ) -> CreateFromGeneratedImageResult: ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        method: Literal["file", "prompt", "image"] | None = None,
+        file: str | None = None,
+        prompt: str | None = None,
+        name: str | None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+        on_previews_ready: Optional[Callable] = None,
+    ) -> Union[CreateCharacterResult, CharacterPreviewResult, CreateFromGeneratedImageResult]: ...
 
     async def create(
         self,
-        file_path: str,
         *,
+        method: Literal["file", "prompt", "image"] | None = None,
+        file: str | None = None,
+        prompt: str | None = None,
+        name: str | None = None,
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
-    ) -> CreateCharacterResult:
-        """Upload and optionally auto-rig a 3D character model."""
-        variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
-        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
-        map_data = json.dumps({"0": ["variables.file"]})
+        on_previews_ready: Optional[Callable] = None,
+    ) -> Union[CreateCharacterResult, CharacterPreviewResult, CreateFromGeneratedImageResult]:
+        """Create a character.
 
-        with open(file_path, "rb") as f:
-            async with httpx.AsyncClient(
-                auth=(self._client._api_key, ""), timeout=self._client._timeout
-            ) as http:
-                response = await http.post(
-                    self._client.graphql_url,
-                    data={"operations": operations, "map": map_data},
-                    files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
+        ``method`` is optional and inferred from the kwargs you pass:
+
+        - ``file`` only (or ``method="file"``) — upload a GLB/FBX and optionally auto-rig.
+          Returns ``CreateCharacterResult``.
+        - ``prompt`` only (or ``method="prompt"``) — generate from a text prompt. With
+          ``on_previews_ready``, calls it with the preview list and finalizes; returns
+          ``CreateFromGeneratedImageResult``. Without it, returns a ``CharacterPreviewResult``
+          to inspect and confirm via ``generate_from_image()``.
+        - ``file`` only with ``method="image"`` — upload an image file and generate a character
+          from it. Always returns ``CreateFromGeneratedImageResult``.
+        """
+        resolved = method or ("prompt" if prompt else "file")
+        if resolved == "file":
+            if not file:
+                raise UthanaError(400, "file is required when method is 'file' (.glb or .fbx)")
+            return await self._create_from_file(file, auto_rig=auto_rig, front_facing=front_facing)
+        if resolved == "prompt":
+            if not prompt:
+                raise UthanaError(400, "prompt is required when method is 'prompt'")
+            return await self._generate_from_text(
+                prompt, name=name, on_previews_ready=on_previews_ready
+            )
+        if resolved == "image":
+            if not file:
+                raise UthanaError(
+                    400, "file is required when method is 'image' (.png, .jpg, .jpeg)"
                 )
+            return await self._generate_from_image(file, name=name)
+        raise UthanaError(400, f"Unknown method: {method!r}")
 
-        result = self._client._check_response(response)
-        return self._client._build_character_output(result=result, ext=ext)
+    @overload
+    def create_sync(
+        self,
+        *,
+        method: Literal["file"] | None = None,
+        file: str,
+        prompt: None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+    ) -> CreateCharacterResult: ...
+
+    @overload
+    def create_sync(
+        self,
+        *,
+        method: Literal["prompt"] | None = None,
+        prompt: str,
+        file: None = None,
+        name: str | None = None,
+        on_previews_ready: Callable,
+    ) -> CreateFromGeneratedImageResult: ...
+
+    @overload
+    def create_sync(
+        self,
+        *,
+        method: Literal["prompt"] | None = None,
+        prompt: str,
+        file: None = None,
+        name: str | None = None,
+        on_previews_ready: None = None,
+    ) -> CharacterPreviewResult: ...
+
+    @overload
+    def create_sync(
+        self,
+        *,
+        method: Literal["image"] | None = None,
+        file: str,
+        name: str | None = None,
+    ) -> CreateFromGeneratedImageResult: ...
+
+    @overload
+    def create_sync(
+        self,
+        *,
+        method: Literal["file", "prompt", "image"] | None = None,
+        file: str | None = None,
+        prompt: str | None = None,
+        name: str | None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+        on_previews_ready: Optional[Callable] = None,
+    ) -> Union[CreateCharacterResult, CharacterPreviewResult, CreateFromGeneratedImageResult]: ...
 
     def create_sync(
         self,
-        file_path: str,
         *,
+        method: Literal["file", "prompt", "image"] | None = None,
+        file: str | None = None,
+        prompt: str | None = None,
+        name: str | None = None,
         auto_rig: bool | None = None,
         front_facing: bool | None = None,
-    ) -> CreateCharacterResult:
-        """Upload and optionally auto-rig a 3D character model (sync)."""
-        return asyncio.run(self.create(file_path, auto_rig=auto_rig, front_facing=front_facing))
+        on_previews_ready: Optional[Callable] = None,
+    ) -> Union[CreateCharacterResult, CharacterPreviewResult, CreateFromGeneratedImageResult]:
+        """Create a character (sync). See ``create()`` for parameter docs."""
+        return asyncio.run(
+            self.create(
+                method=method,
+                file=file,
+                prompt=prompt,
+                name=name,
+                auto_rig=auto_rig,
+                front_facing=front_facing,
+                on_previews_ready=on_previews_ready,
+            )
+        )
+
+    async def generate_from_image(
+        self,
+        pending: CharacterPreviewResult,
+        image_key: str,
+    ) -> CreateFromGeneratedImageResult:
+        """Finalize a character from a previously generated preview (step 2 of the two-step flow).
+
+        Use when ``create()`` was called without ``on_previews_ready`` and returned a
+        ``CharacterPreviewResult``. Pick a key from ``pending.previews`` and pass it here.
+        """
+        return await self._finalize_from_image(
+            pending.character_id, image_key, prompt=pending.prompt
+        )
+
+    def generate_from_image_sync(
+        self,
+        pending: CharacterPreviewResult,
+        image_key: str,
+    ) -> CreateFromGeneratedImageResult:
+        """Finalize a character from a previously generated preview (sync)."""
+        return asyncio.run(self.generate_from_image(pending, image_key))
 
     async def list(self) -> list[Character]:
         """List all characters for the authenticated user."""
@@ -103,37 +266,46 @@ class CharactersModule(_BaseModule):
         """Download a character model in the requested format (sync)."""
         return asyncio.run(self.download(character_id, output_format=output_format))
 
-    async def generate_from_text(self, prompt: str) -> GenerateFromTextResult:
-        """Generate character preview images from a text prompt. Returns character_id and images."""
-        data = await self._client._graphql(
-            q.CREATE_IMAGE_FROM_TEXT,
-            {"prompt": prompt},
-            path="create_image_from_text",
-        )
-        data = data or {}
-        return GenerateFromTextResult(
-            character_id=data.get("character_id", ""),
-            images=data.get("images") or [],
+    async def rename(self, character_id: str, name: str) -> Character:
+        """Rename a character by ID."""
+        return await self._client._graphql(
+            q.RENAME_CHARACTER,
+            {"character_id": character_id, "name": name},
+            path="update_character.character",
+            return_type=Character,
         )
 
-    def generate_from_text_sync(self, prompt: str) -> GenerateFromTextResult:
-        """Generate character preview images from a text prompt (sync)."""
-        return asyncio.run(self.generate_from_text(prompt))
+    def rename_sync(self, character_id: str, name: str) -> Character:
+        """Rename a character by ID (sync)."""
+        return asyncio.run(self.rename(character_id, name))
 
-    async def generate_from_image(self, file_path: str) -> GenerateFromImageResult:
-        """Generate a character preview image from an uploaded image file."""
-        import os
-
-        name = os.path.splitext(os.path.basename(file_path))[0]
-        ext = os.path.splitext(file_path)[1].lstrip(".")
-        operations = json.dumps(
-            {
-                "query": q.CREATE_IMAGE_FROM_IMAGE,
-                "variables": {"file": None},
-            }
+    async def delete(self, character_id: str) -> Character:
+        """Soft-delete a character by ID."""
+        return await self._client._graphql(
+            q.DELETE_CHARACTER,
+            {"character_id": character_id},
+            path="update_character.character",
+            return_type=Character,
         )
+
+    def delete_sync(self, character_id: str) -> Character:
+        """Soft-delete a character by ID (sync)."""
+        return asyncio.run(self.delete(character_id))
+
+    # ---------------------------------------------------------------------------
+    # Private helpers — one per GQL call (or combined where always sequential)
+    # ---------------------------------------------------------------------------
+
+    async def _create_from_file(
+        self,
+        file_path: str,
+        *,
+        auto_rig: bool | None,
+        front_facing: bool | None,
+    ) -> CreateCharacterResult:
+        variables, name, ext, _ = prepare_create_character(file_path, auto_rig, front_facing)
+        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
-
         with open(file_path, "rb") as f:
             async with httpx.AsyncClient(
                 auth=(self._client._api_key, ""), timeout=self._client._timeout
@@ -143,128 +315,75 @@ class CharactersModule(_BaseModule):
                     data={"operations": operations, "map": map_data},
                     files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
                 )
-
         result = self._client._check_response(response)
-        data = (result.get("data") or {}).get("create_image_from_image") or {}
-        return GenerateFromImageResult(
-            character_id=data.get("character_id", ""),
-            image=data.get("image") or {},
+        return self._client._build_character_output(result=result, ext=ext)
+
+    async def _generate_from_text(
+        self,
+        prompt: str,
+        *,
+        name: str | None,
+        on_previews_ready: Optional[Callable],
+    ) -> CharacterPreviewResult | CreateFromGeneratedImageResult:
+        """CREATE_IMAGE_FROM_TEXT → optional callback/two-step → _finalize_from_image."""
+        import inspect
+
+        data = await self._client._graphql(
+            q.CREATE_IMAGE_FROM_TEXT,
+            {"prompt": prompt},
+            path="create_image_from_text",
         )
+        data = data or {}
+        character_id, images = data.get("character_id", ""), data.get("images") or []
+        if on_previews_ready is None:
+            return CharacterPreviewResult(character_id=character_id, previews=images, prompt=prompt)
+        raw = on_previews_ready(images)
+        key = (await raw) if inspect.iscoroutine(raw) else raw
+        if not key:
+            raise UthanaError(400, "No preview image selected")
+        return await self._finalize_from_image(character_id, key, name, prompt=prompt)
 
-    def generate_from_image_sync(self, file_path: str) -> GenerateFromImageResult:
-        """Generate a character preview image from an uploaded image file (sync)."""
-        return asyncio.run(self.generate_from_image(file_path))
+    async def _generate_from_image(
+        self,
+        file_path: str,
+        *,
+        name: str | None,
+    ) -> CreateFromGeneratedImageResult:
+        """CREATE_IMAGE_FROM_IMAGE → _finalize_from_image. Always single-step."""
+        name_part = os.path.splitext(os.path.basename(file_path))[0]
+        ext = os.path.splitext(file_path)[1].lstrip(".")
+        operations = json.dumps({"query": q.CREATE_IMAGE_FROM_IMAGE, "variables": {"file": None}})
+        map_data = json.dumps({"0": ["variables.file"]})
+        with open(file_path, "rb") as f:
+            async with httpx.AsyncClient(
+                auth=(self._client._api_key, ""), timeout=self._client._timeout
+            ) as http:
+                response = await http.post(
+                    self._client.graphql_url,
+                    data={"operations": operations, "map": map_data},
+                    files={"0": (f"{name_part}.{ext}", f, "application/octet-stream")},
+                )
+        result = self._client._check_response(response)
+        gql_data = (result.get("data") or {}).get("create_image_from_image") or {}
+        character_id = gql_data.get("character_id", "")
+        image = gql_data.get("image") or {}
+        return await self._finalize_from_image(character_id, image.get("key", ""), name)
 
-    async def create_from_generated_image(
+    async def _finalize_from_image(
         self,
         character_id: str,
         image_key: str,
-        prompt: str,
-        *,
-        name: Optional[str] = None,
+        name: str | None = None,
+        prompt: str = "",
     ) -> CreateFromGeneratedImageResult:
-        """Create a character from a previously generated image
-        (from generate_from_text or generate_from_image)."""
+        """CREATE_CHARACTER_FROM_IMAGE — shared finalization step."""
         data = await self._client._graphql(
             q.CREATE_CHARACTER_FROM_IMAGE,
-            {
-                "character_id": character_id,
-                "image_key": image_key,
-                "prompt": prompt,
-                "name": name,
-            },
+            {"character_id": character_id, "image_key": image_key, "prompt": prompt, "name": name},
             path="create_character_from_image",
         )
         data = data or {}
         return CreateFromGeneratedImageResult(
             character=data.get("character") or {},
             auto_rig_confidence=data.get("auto_rig_confidence"),
-        )
-
-    def create_from_generated_image_sync(
-        self,
-        character_id: str,
-        image_key: str,
-        prompt: str,
-        *,
-        name: Optional[str] = None,
-    ) -> CreateFromGeneratedImageResult:
-        """Create a character from a previously generated image (sync)."""
-        return asyncio.run(
-            self.create_from_generated_image(character_id, image_key, prompt, name=name)
-        )
-
-    async def create_from_text(
-        self,
-        prompt: str,
-        *,
-        name: Optional[str] = None,
-        on_previews_ready: Optional[Callable] = None,
-    ) -> CreateFromGeneratedImageResult:
-        """Create a character from a text prompt.
-
-        Generates preview images, calls ``on_previews_ready(previews)`` to select
-        one (defaults to first), then finalizes the character. ``on_previews_ready``
-        may be a regular function or an async function.
-        """
-        result = await self.generate_from_text(prompt)
-        if on_previews_ready is not None:
-            raw = on_previews_ready(result.images)
-            key = (await raw) if inspect.iscoroutine(raw) else raw
-        else:
-            key = result.images[0]["key"] if result.images else None
-        if not key:
-            raise UthanaError(400, "No preview image selected")
-        return await self.create_from_generated_image(result.character_id, key, prompt, name=name)
-
-    def create_from_text_sync(
-        self,
-        prompt: str,
-        *,
-        name: Optional[str] = None,
-        on_previews_ready: Optional[Callable] = None,
-    ) -> CreateFromGeneratedImageResult:
-        """Create a character from a text prompt (sync)."""
-        return asyncio.run(
-            self.create_from_text(prompt, name=name, on_previews_ready=on_previews_ready)
-        )
-
-    async def create_from_image(
-        self,
-        file_path: str,
-        *,
-        prompt: str,
-        name: Optional[str] = None,
-        on_previews_ready: Optional[Callable] = None,
-    ) -> CreateFromGeneratedImageResult:
-        """Create a character from an image file.
-
-        Generates a preview image, calls ``on_previews_ready([preview])`` to
-        confirm (defaults to auto-confirming the single preview), then finalizes
-        the character. ``on_previews_ready`` may be a regular or async function.
-        """
-        result = await self.generate_from_image(file_path)
-        previews = [result.image]
-        if on_previews_ready is not None:
-            raw = on_previews_ready(previews)
-            key = (await raw) if inspect.iscoroutine(raw) else raw
-        else:
-            key = result.image.get("key")
-        if not key:
-            raise UthanaError(400, "No preview image selected")
-        return await self.create_from_generated_image(result.character_id, key, prompt, name=name)
-
-    def create_from_image_sync(
-        self,
-        file_path: str,
-        *,
-        prompt: str,
-        name: Optional[str] = None,
-        on_previews_ready: Optional[Callable] = None,
-    ) -> CreateFromGeneratedImageResult:
-        """Create a character from an image file (sync)."""
-        return asyncio.run(
-            self.create_from_image(
-                file_path, prompt=prompt, name=name, on_previews_ready=on_previews_ready
-            )
         )

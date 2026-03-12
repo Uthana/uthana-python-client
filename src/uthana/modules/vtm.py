@@ -29,7 +29,7 @@ class VtmModule(_BaseModule):
     ) -> VideoToMotionResult:
         """Extract motion capture data from a video. Returns a job to poll via jobs.get().
 
-        Model defaults to models.ini when omitted or set to \"auto\".
+        Model defaults to models.toml when omitted or set to \"auto\".
         """
         variables, filename = prepare_video_to_motion(file_path, motion_name)
         if model is None:

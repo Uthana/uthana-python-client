@@ -5,11 +5,10 @@
 from .client import Client, Uthana
 from .types import (
     Character,
+    CharacterPreviewResult,
     CreateCharacterResult,
     CreateFromGeneratedImageResult,
     Error,
-    GenerateFromImageResult,
-    GenerateFromTextResult,
     Job,
     ModelType,
     Motion,
@@ -26,12 +25,11 @@ from .types import (
 
 __all__ = [
     "Character",
+    "CharacterPreviewResult",
     "Client",
     "CreateCharacterResult",
     "CreateFromGeneratedImageResult",
     "Error",
-    "GenerateFromImageResult",
-    "GenerateFromTextResult",
     "Job",
     "ModelType",
     "Motion",

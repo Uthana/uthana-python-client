@@ -95,6 +95,9 @@ query GetJob($job_id: String!) {
         id
         status
         result
+        created_at
+        started_at
+        ended_at
     }
 }
 """
@@ -105,8 +108,9 @@ query ListJobs($method: String) {
         id
         status
         method
-        created
-        updated
+        created_at
+        started_at
+        ended_at
     }
 }
 """
@@ -196,6 +200,28 @@ mutation CreateCharacterFromImage(
             name
         }
         auto_rig_confidence
+    }
+}
+"""
+
+    RENAME_CHARACTER = """
+mutation RenameCharacter($character_id: String!, $name: String!) {
+    update_character(character_id: $character_id, name: $name) {
+        character {
+            id
+            name
+        }
+    }
+}
+"""
+
+    DELETE_CHARACTER = """
+mutation DeleteCharacter($character_id: String!) {
+    update_character(character_id: $character_id, deleted: true) {
+        character {
+            id
+            name
+        }
     }
 }
 """

@@ -16,8 +16,14 @@ import time
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
 from uthana import Job, Uthana, UthanaCharacters
+
+# Load .env / .env.local before reading env (conftest may run after this module is imported)
+_root = Path(__file__).resolve().parent.parent
+load_dotenv(_root / ".env")
+load_dotenv(_root / ".env.local", override=True)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ARTIFACTS_DIR = Path(__file__).parent / "artifacts"
@@ -72,7 +78,7 @@ def test_create_text_to_motion_vqvae_v1_fbx(client: Uthana) -> None:
 
 @requires_api_key
 def test_create_character_glb(client: Uthana) -> None:
-    output = client.characters.create_sync(str(FIXTURES_DIR / "pig.glb"))
+    output = client.characters.create_sync(file=str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
     assert output.url
@@ -86,7 +92,7 @@ def test_create_character_glb(client: Uthana) -> None:
 @pytest.mark.smoke
 @requires_api_key
 def test_create_character_fbx(client: Uthana) -> None:
-    output = client.characters.create_sync(str(FIXTURES_DIR / "wrestler.fbx"))
+    output = client.characters.create_sync(file=str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
     assert output.url
@@ -149,7 +155,7 @@ async def test_create_text_to_motion_diffusion_v2_glb_async(client: Uthana) -> N
 @requires_api_key
 @pytest.mark.asyncio
 async def test_create_character_glb_async(client: Uthana) -> None:
-    output = await client.characters.create(str(FIXTURES_DIR / "pig.glb"))
+    output = await client.characters.create(file=str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
     assert output.url
@@ -163,7 +169,7 @@ async def test_create_character_glb_async(client: Uthana) -> None:
 @requires_api_key
 @pytest.mark.asyncio
 async def test_create_character_fbx_async(client: Uthana) -> None:
-    output = await client.characters.create(str(FIXTURES_DIR / "wrestler.fbx"))
+    output = await client.characters.create(file=str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
     assert output.url
@@ -200,8 +206,9 @@ async def _apoll_job(
 @requires_long_tests
 @pytest.mark.asyncio
 async def test_characters_create_from_text(client: Uthana) -> None:
-    result = await client.characters.create_from_text(
-        "a futuristic soldier in heavy armor",
+    result = await client.characters.create(
+        method="prompt",
+        prompt="a futuristic soldier in heavy armor",
         on_previews_ready=lambda previews: previews[0]["key"],
     )
     assert result.character.get("id")
@@ -299,6 +306,12 @@ def test_jobs_list(client: Uthana) -> None:
     for j in jobs:
         assert j.get("id")
         assert j.get("status")
+        assert "created" in j
+        assert "started" in j
+        assert "ended" in j
+        assert "created_at" not in j
+        assert "started_at" not in j
+        assert "ended_at" not in j
 
 
 @requires_api_key
@@ -308,3 +321,9 @@ def test_jobs_list_filtered_by_method(client: Uthana) -> None:
     for j in jobs:
         assert j.get("id")
         assert j.get("method") == "VideoToMotion"
+        assert "created" in j
+        assert "started" in j
+        assert "ended" in j
+        assert "created_at" not in j
+        assert "started_at" not in j
+        assert "ended_at" not in j

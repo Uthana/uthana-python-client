@@ -28,7 +28,7 @@ class TtmModule(_BaseModule):
     ) -> TextToMotionResult:
         """Generate a 3D character animation from a natural language prompt.
 
-        Model defaults to the value in models.ini when omitted or set to \"auto\".
+        Model defaults to the value in models.toml when omitted or set to \"auto\".
         """
         if model is None:
             model = models.ttm.default

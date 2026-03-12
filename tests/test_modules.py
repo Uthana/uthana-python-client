@@ -8,9 +8,8 @@ import pytest
 
 from uthana import Uthana, UthanaCharacters
 from uthana.types import (
+    CharacterPreviewResult,
     CreateFromGeneratedImageResult,
-    GenerateFromImageResult,
-    GenerateFromTextResult,
 )
 
 # ---------------------------------------------------------------------------
@@ -28,13 +27,28 @@ def _make_client() -> Uthana:
         return Uthana("fake-key")
 
 
+def _make_httpx_mock(response_data: dict):
+    """Build a mock httpx.AsyncClient context manager returning JSON response_data."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.is_success = True
+    mock_response.json.return_value = {"data": response_data}
+
+    mock_http = AsyncMock()
+    mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+    mock_http.__aexit__ = AsyncMock(return_value=False)
+    mock_http.post = AsyncMock(return_value=mock_response)
+
+    return mock_http
+
+
 # ---------------------------------------------------------------------------
-# characters.generate_from_text
+# characters.create — method="prompt" (two-step, no callback)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_generate_from_text_returns_result() -> None:
+async def test_create_prompt_no_callback_returns_preview_result() -> None:
     client = _make_client()
     client._graphql = AsyncMock(
         return_value={
@@ -46,205 +60,203 @@ async def test_generate_from_text_returns_result() -> None:
         }
     )
 
-    result = await client.characters.generate_from_text("a knight in armor")
+    result = await client.characters.create(prompt="a knight in armor")
 
+    assert isinstance(result, CharacterPreviewResult)
     assert result.character_id == "c1"
-    assert len(result.images) == 2
-    assert result.images[0]["key"] == "k1"
+    assert len(result.previews) == 2
+    assert result.previews[0]["key"] == "k1"
+    assert result.prompt == "a knight in armor"
 
 
 # ---------------------------------------------------------------------------
-# characters.create_from_generated_image
+# characters.create — method="prompt" with sync callback
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_from_generated_image_returns_result() -> None:
+async def test_create_prompt_with_sync_callback_returns_finalized() -> None:
     client = _make_client()
     client._graphql = AsyncMock(
-        return_value={
-            "character": {"id": "c1", "name": "Knight"},
-            "auto_rig_confidence": 0.9,
-        }
+        side_effect=[
+            # CREATE_IMAGE_FROM_TEXT
+            {
+                "character_id": "c1",
+                "images": [{"key": "k1", "url": "u1"}, {"key": "k2", "url": "u2"}],
+            },
+            # CREATE_CHARACTER_FROM_IMAGE
+            {"character": {"id": "c1", "name": "Knight"}, "auto_rig_confidence": 0.9},
+        ]
     )
 
-    result = await client.characters.create_from_generated_image(
-        "c1", "k1", "a knight in armor", name="Knight"
-    )
-
-    assert result.character["id"] == "c1"
-    assert result.auto_rig_confidence == 0.9
-    client._graphql.assert_called_once()
-    call_vars = client._graphql.call_args[0][1]
-    assert call_vars["character_id"] == "c1"
-    assert call_vars["image_key"] == "k1"
-    assert call_vars["name"] == "Knight"
-
-
-# ---------------------------------------------------------------------------
-# characters.create_from_text
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_create_from_text_defaults_to_first_preview() -> None:
-    client = _make_client()
-    client.characters.generate_from_text = AsyncMock(
-        return_value=GenerateFromTextResult(
-            character_id="c1",
-            images=[{"key": "k1", "url": "u1"}, {"key": "k2", "url": "u2"}],
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=0.85,
-        )
-    )
-
-    result = await client.characters.create_from_text("a knight")
-
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k1", "a knight", name=None
-    )
-    assert result.character["id"] == "c1"
-
-
-@pytest.mark.asyncio
-async def test_create_from_text_lambda_on_previews_ready() -> None:
-    client = _make_client()
-    client.characters.generate_from_text = AsyncMock(
-        return_value=GenerateFromTextResult(
-            character_id="c1",
-            images=[{"key": "k1", "url": "u1"}, {"key": "k2", "url": "u2"}],
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=0.85,
-        )
-    )
-
-    await client.characters.create_from_text(
-        "a knight",
+    result = await client.characters.create(
+        prompt="a knight",
         on_previews_ready=lambda previews: previews[1]["key"],  # pick second
     )
 
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k2", "a knight", name=None
-    )
+    assert isinstance(result, CreateFromGeneratedImageResult)
+    assert result.character["id"] == "c1"
+    assert result.auto_rig_confidence == 0.9
+    finalize_vars = client._graphql.call_args_list[1][0][1]
+    assert finalize_vars["image_key"] == "k2"
+    assert finalize_vars["prompt"] == "a knight"
+
+
+# ---------------------------------------------------------------------------
+# characters.create — method="prompt" with async callback
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_from_text_async_on_previews_ready() -> None:
+async def test_create_prompt_with_async_callback() -> None:
     client = _make_client()
-    client.characters.generate_from_text = AsyncMock(
-        return_value=GenerateFromTextResult(
-            character_id="c1",
-            images=[{"key": "k1", "url": "u1"}],
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=None,
-        )
+    client._graphql = AsyncMock(
+        side_effect=[
+            {"character_id": "c1", "images": [{"key": "k1", "url": "u1"}]},
+            {"character": {"id": "c1", "name": "Knight"}, "auto_rig_confidence": None},
+        ]
     )
 
     async def async_picker(previews):
         return previews[0]["key"]
 
-    await client.characters.create_from_text("a knight", on_previews_ready=async_picker)
+    result = await client.characters.create(prompt="a knight", on_previews_ready=async_picker)
 
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k1", "a knight", name=None
-    )
-
-
-@pytest.mark.asyncio
-async def test_create_from_text_passes_name() -> None:
-    client = _make_client()
-    client.characters.generate_from_text = AsyncMock(
-        return_value=GenerateFromTextResult(
-            character_id="c1",
-            images=[{"key": "k1", "url": "u1"}],
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=None,
-        )
-    )
-
-    await client.characters.create_from_text("a knight", name="Knight")
-
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k1", "a knight", name="Knight"
-    )
+    assert isinstance(result, CreateFromGeneratedImageResult)
+    finalize_vars = client._graphql.call_args_list[1][0][1]
+    assert finalize_vars["image_key"] == "k1"
 
 
 # ---------------------------------------------------------------------------
-# characters.create_from_image
+# characters.create — name forwarded to finalize call
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_from_image_auto_confirms_single_preview() -> None:
+async def test_create_prompt_passes_name() -> None:
     client = _make_client()
-    client.characters.generate_from_image = AsyncMock(
-        return_value=GenerateFromImageResult(
-            character_id="c1",
-            image={"key": "k1", "url": "u1"},
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=0.7,
-        )
+    client._graphql = AsyncMock(
+        side_effect=[
+            {"character_id": "c1", "images": [{"key": "k1", "url": "u1"}]},
+            {"character": {"id": "c1", "name": "Warrior"}, "auto_rig_confidence": None},
+        ]
     )
 
-    result = await client.characters.create_from_image(
-        "path/to/ref.png", prompt="a knight in armor"
+    await client.characters.create(
+        prompt="a warrior",
+        name="Warrior",
+        on_previews_ready=lambda p: p[0]["key"],
     )
 
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k1", "a knight in armor", name=None
-    )
-    assert result.character["id"] == "c1"
+    finalize_vars = client._graphql.call_args_list[1][0][1]
+    assert finalize_vars["name"] == "Warrior"
+
+
+# ---------------------------------------------------------------------------
+# characters.generate_from_image — step 2 of two-step flow
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_from_image_lambda_on_previews_ready() -> None:
+async def test_generate_from_image_finalizes_with_prompt() -> None:
     client = _make_client()
-    client.characters.generate_from_image = AsyncMock(
-        return_value=GenerateFromImageResult(
-            character_id="c1",
-            image={"key": "k1", "url": "u1"},
-        )
-    )
-    client.characters.create_from_generated_image = AsyncMock(
-        return_value=CreateFromGeneratedImageResult(
-            character={"id": "c1"},
-            auto_rig_confidence=None,
-        )
+    client._graphql = AsyncMock(
+        return_value={"character": {"id": "c1", "name": "Knight"}, "auto_rig_confidence": 0.8}
     )
 
-    await client.characters.create_from_image(
-        "path/to/ref.png",
+    pending = CharacterPreviewResult(
+        character_id="c1",
+        previews=[{"key": "k1", "url": "u1"}],
         prompt="a knight",
-        on_previews_ready=lambda previews: previews[0]["key"],
     )
+    result = await client.characters.generate_from_image(pending, "k1")
 
-    client.characters.create_from_generated_image.assert_called_once_with(
-        "c1", "k1", "a knight", name=None
-    )
+    assert result.character["id"] == "c1"
+    finalize_vars = client._graphql.call_args[0][1]
+    assert finalize_vars["character_id"] == "c1"
+    assert finalize_vars["image_key"] == "k1"
+    assert finalize_vars["prompt"] == "a knight"
 
 
 # ---------------------------------------------------------------------------
-# motions.preview (renamed from download_preview)
+# characters.create — method="image" (upload image file, single-step)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_image_uploads_and_finalizes(tmp_path) -> None:
+    img_file = tmp_path / "ref.png"
+    img_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+
+    mock_http = _make_httpx_mock(
+        {"create_image_from_image": {"character_id": "c2", "image": {"key": "k2", "url": "u2"}}}
+    )
+
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={"character": {"id": "c2", "name": "Archer"}, "auto_rig_confidence": 0.7}
+    )
+
+    with patch("uthana.modules.characters.httpx.AsyncClient", return_value=mock_http):
+        result = await client.characters.create(method="image", file=str(img_file))
+
+    assert isinstance(result, CreateFromGeneratedImageResult)
+    assert result.character["id"] == "c2"
+    # prompt is an internal detail — must be passed as "" to the GQL layer
+    finalize_vars = client._graphql.call_args[0][1]
+    assert finalize_vars["image_key"] == "k2"
+    assert finalize_vars["prompt"] == ""
+
+
+# ---------------------------------------------------------------------------
+# characters.create — method="image" raises when file is missing
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_image_raises_without_file() -> None:
+    from uthana.types import UthanaError
+
+    client = _make_client()
+    with pytest.raises(UthanaError):
+        await client.characters.create(method="image")  # type: ignore[call-overload]
+
+
+# ---------------------------------------------------------------------------
+# characters.rename
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_rename_calls_mutation() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "c1", "name": "New Name"})
+
+    await client.characters.rename("c1", "New Name")
+
+    call_vars = client._graphql.call_args[0][1]
+    assert call_vars["character_id"] == "c1"
+    assert call_vars["name"] == "New Name"
+
+
+# ---------------------------------------------------------------------------
+# characters.delete
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_calls_mutation() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "c1", "name": "Knight"})
+
+    await client.characters.delete("c1")
+
+    call_vars = client._graphql.call_args[0][1]
+    assert call_vars["character_id"] == "c1"
+
+
+# ---------------------------------------------------------------------------
+# motions.preview
 # ---------------------------------------------------------------------------
 
 
@@ -301,3 +313,94 @@ async def test_bake_with_changes_uses_provided_character_id() -> None:
     assert result.character_id == "custom-char"
     call_vars = client._graphql.call_args[0][1]
     assert call_vars["characterId"] == "custom-char"
+
+
+# ---------------------------------------------------------------------------
+# jobs.list — timestamp normalization (created_at/started_at/ended_at → public names)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_jobs_list_normalizes_timestamps() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value=[
+            {
+                "id": "j1",
+                "status": "FINISHED",
+                "method": "VideoToMotion",
+                "created_at": "2026-01-01T00:00:00Z",
+                "started_at": "2026-01-01T00:01:00Z",
+                "ended_at": "2026-01-01T00:02:00Z",
+            },
+            {
+                "id": "j2",
+                "status": "PENDING",
+                "method": "VideoToMotion",
+                "created_at": "2026-01-03T00:00:00Z",
+                "started_at": None,
+                "ended_at": None,
+            },
+        ]
+    )
+
+    jobs = await client.jobs.list()
+
+    assert len(jobs) == 2
+    for job in jobs:
+        assert "created_at" not in job
+        assert "started_at" not in job
+        assert "ended_at" not in job
+    assert jobs[0]["created"] == "2026-01-01T00:00:00Z"
+    assert jobs[0]["started"] == "2026-01-01T00:01:00Z"
+    assert jobs[0]["ended"] == "2026-01-01T00:02:00Z"
+    assert jobs[1]["created"] == "2026-01-03T00:00:00Z"
+    assert jobs[1]["started"] is None
+    assert jobs[1]["ended"] is None
+
+
+@pytest.mark.asyncio
+async def test_jobs_list_handles_missing_timestamps() -> None:
+    """Jobs missing timestamp fields are left without created/started/ended keys."""
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value=[{"id": "j1", "status": "FINISHED", "method": "VideoToMotion"}]
+    )
+
+    jobs = await client.jobs.list()
+
+    assert jobs[0].get("created") is None
+    assert jobs[0].get("started") is None
+    assert jobs[0].get("ended") is None
+    assert "created_at" not in jobs[0]
+    assert "started_at" not in jobs[0]
+    assert "ended_at" not in jobs[0]
+
+
+# ---------------------------------------------------------------------------
+# jobs.get — timestamp normalization
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_jobs_get_normalizes_timestamps() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={
+            "id": "j1",
+            "status": "FINISHED",
+            "result": {"id": "m1"},
+            "created_at": "2026-01-01T00:00:00Z",
+            "started_at": "2026-01-01T00:01:00Z",
+            "ended_at": "2026-01-01T00:02:00Z",
+        }
+    )
+
+    job = await client.jobs.get("j1")
+
+    assert job["created"] == "2026-01-01T00:00:00Z"
+    assert job["started"] == "2026-01-01T00:01:00Z"
+    assert job["ended"] == "2026-01-01T00:02:00Z"
+    assert "created_at" not in job
+    assert "started_at" not in job
+    assert "ended_at" not in job

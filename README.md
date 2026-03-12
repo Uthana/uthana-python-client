@@ -143,7 +143,7 @@ uthana_client = Uthana("your-api-key")
 
 async def manage_characters():
     # Upload and auto-rig a character from a file
-    output = await uthana_client.characters.create("path/to/character.glb")
+    output = await uthana_client.characters.create(file="path/to/character.glb")
     print(output.character_id)
     print(output.auto_rig_confidence)  # 0–1.0, higher is better
 
@@ -156,32 +156,29 @@ async def manage_characters():
     for c in await uthana_client.characters.list():
         print(c.get("id"), c.get("name"))
 
-    # Text-to-character: auto-pick first preview
-    result = await uthana_client.characters.create_from_text(
-        "a knight in shining armor",
+    # Text-to-character: one-shot with callback
+    result = await uthana_client.characters.create(
+        prompt="a knight in shining armor",
         name="Knight",
         on_previews_ready=lambda previews: previews[0]["key"],
     )
     print(result.character.get("id"))
 
-    # Text-to-character: custom preview selection (e.g. show a UI and return the chosen key)
-    result = await uthana_client.characters.create_from_text(
-        "a futuristic soldier",
+    # Text-to-character: async callback (e.g. show a UI and return the chosen key)
+    result = await uthana_client.characters.create(
+        prompt="a futuristic soldier",
         on_previews_ready=lambda previews: show_picker_ui(previews),
     )
 
-    # Text-to-character: two-step (generate previews first, then confirm separately)
-    gen = await uthana_client.characters.generate_from_text("a futuristic soldier")
-    # gen.images is a list of {"key": ..., "url": ...} — show them to the user
-    chosen_key = gen.images[0]["key"]
-    result = await uthana_client.characters.create_from_generated_image(
-        gen.character_id, chosen_key, "a futuristic soldier", name="Soldier"
-    )
+    # Text-to-character: two-step (inspect previews before confirming)
+    pending = await uthana_client.characters.create(prompt="a futuristic soldier")
+    # pending.previews is a list of {"key": ..., "url": ...} — show them to the user
+    result = await uthana_client.characters.generate_from_image(pending, pending.previews[0]["key"])
 
-    # Image-to-character: auto-confirms the single generated preview
-    result = await uthana_client.characters.create_from_image(
-        "path/to/reference.png",
-        prompt="a knight in armor",
+    # Image-to-character: upload an image file (always one-shot)
+    result = await uthana_client.characters.create(
+        method="image",
+        file="path/to/reference.png",
     )
 
     # Rename or delete

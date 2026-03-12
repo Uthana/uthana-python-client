@@ -1,11 +1,14 @@
 [project]
 name = "uthana"
-version = "1.1.0-rc.0"
+version = "0.2.0"
 description = "A Python client for Uthana: generate lifelike human motion from text or 2D video, create and auto-rig characters, and manage your motions."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-dependencies = ["httpx"]
+dependencies = [
+    "httpx",
+    "tomli>=2.0.0; python_version < '3.11'",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -15,12 +18,13 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-uthana = ["models.ini", "py.typed"]
+uthana = ["models.toml", "py.typed"]
 
 [tool.uv]
 default-groups = ["dev"]
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 markers = [
     "smoke: subset of full tests",
     "timeout: fail test if it exceeds the given number of seconds",
