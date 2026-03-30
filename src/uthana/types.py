@@ -96,7 +96,7 @@ class TextToMotionResult:
 
 @dataclass
 class CreateCharacterResult:
-    """Result of characters.create(from_="file")."""
+    """Result of characters.create_from_file."""
 
     url: str
     character_id: str
@@ -105,8 +105,8 @@ class CreateCharacterResult:
 
 @dataclass
 class CharacterPreviewResult:
-    """Intermediate result of characters.create(from_="prompt"|"image") when no on_previews_ready
-    callback is provided. Pass to characters.generate_from_image() to finalize the character."""
+    """Intermediate result of characters.create_from_prompt when no on_previews_ready
+    callback is provided. Pass to characters.generate_from_image to finalize the character."""
 
     character_id: str
     previews: list
@@ -115,8 +115,8 @@ class CharacterPreviewResult:
 
 @dataclass
 class CreateFromGeneratedImageResult:
-    """Result of characters.create(from_="prompt"|"image", on_previews_ready=...)
-    or characters.generate_from_image()."""
+    """Result of characters.create_from_prompt / characters.create_from_image (with callback where
+    applicable), or characters.generate_from_image."""
 
     character: dict
     auto_rig_confidence: float | None = None

@@ -78,7 +78,7 @@ def test_create_text_to_motion_vqvae_v1_fbx(client: Uthana) -> None:
 
 @requires_api_key
 def test_create_character_glb(client: Uthana) -> None:
-    output = client.characters.create_sync(file=str(FIXTURES_DIR / "pig.glb"))
+    output = client.characters.create_from_file_sync(str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
     assert output.url
@@ -92,7 +92,7 @@ def test_create_character_glb(client: Uthana) -> None:
 @pytest.mark.smoke
 @requires_api_key
 def test_create_character_fbx(client: Uthana) -> None:
-    output = client.characters.create_sync(file=str(FIXTURES_DIR / "wrestler.fbx"))
+    output = client.characters.create_from_file_sync(str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
     assert output.url
@@ -155,7 +155,7 @@ async def test_create_text_to_motion_diffusion_v2_glb_async(client: Uthana) -> N
 @requires_api_key
 @pytest.mark.asyncio
 async def test_create_character_glb_async(client: Uthana) -> None:
-    output = await client.characters.create(file=str(FIXTURES_DIR / "pig.glb"))
+    output = await client.characters.create_from_file(str(FIXTURES_DIR / "pig.glb"))
 
     assert output.character_id
     assert output.url
@@ -169,7 +169,7 @@ async def test_create_character_glb_async(client: Uthana) -> None:
 @requires_api_key
 @pytest.mark.asyncio
 async def test_create_character_fbx_async(client: Uthana) -> None:
-    output = await client.characters.create(file=str(FIXTURES_DIR / "wrestler.fbx"))
+    output = await client.characters.create_from_file(str(FIXTURES_DIR / "wrestler.fbx"))
 
     assert output.character_id
     assert output.url
@@ -206,8 +206,7 @@ async def _apoll_job(
 @requires_long_tests
 @pytest.mark.asyncio
 async def test_characters_create_from_text(client: Uthana) -> None:
-    result = await client.characters.create(
-        method="prompt",
+    result = await client.characters.create_from_prompt(
         prompt="a futuristic soldier in heavy armor",
         on_previews_ready=lambda previews: previews[0]["key"],
     )

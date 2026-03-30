@@ -1,5 +1,26 @@
 #!/usr/bin/env python3
-"""Release helper for SemVer tags and version synchronization."""
+"""Release helper: keep git tags and pyproject.toml version aligned for PyPI releases.
+
+Run by maintainers before publishing (see README "Releasing and PyPI").
+
+Commands:
+
+  prepare --version SEMVER
+      Bump project.version in pyproject.toml (if needed), optionally commit,
+      and create an annotated v* tag. Requires a clean git worktree. Afterward:
+      git push origin <branch> --follow-tags.
+
+  check-tag --tag vX.Y.Z [--github-output PATH]
+      Validate tag shape and that pyproject.toml matches the tag's base version.
+      Used by CI on tag pushes; you rarely run this locally.
+
+Examples:
+
+    python scripts/release.py prepare --version 1.2.3
+    python scripts/release.py check-tag --tag v1.2.3
+
+Use python scripts/release.py --help or prepare --help / check-tag --help.
+"""
 
 from __future__ import annotations
 
@@ -155,7 +176,9 @@ def command_check_tag(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Release and tag helper")
+    parser = argparse.ArgumentParser(
+        description=("Keep pyproject.toml version with v* release tags in sync"),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prepare_parser = subparsers.add_parser(

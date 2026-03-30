@@ -43,7 +43,7 @@ def _make_httpx_mock(response_data: dict):
 
 
 # ---------------------------------------------------------------------------
-# characters.create — method="prompt" (two-step, no callback)
+# characters.create_from_prompt — two-step, no callback
 # ---------------------------------------------------------------------------
 
 
@@ -60,7 +60,7 @@ async def test_create_prompt_no_callback_returns_preview_result() -> None:
         }
     )
 
-    result = await client.characters.create(prompt="a knight in armor")
+    result = await client.characters.create_from_prompt(prompt="a knight in armor")
 
     assert isinstance(result, CharacterPreviewResult)
     assert result.character_id == "c1"
@@ -70,7 +70,7 @@ async def test_create_prompt_no_callback_returns_preview_result() -> None:
 
 
 # ---------------------------------------------------------------------------
-# characters.create — method="prompt" with sync callback
+# characters.create_from_prompt — sync callback
 # ---------------------------------------------------------------------------
 
 
@@ -89,7 +89,7 @@ async def test_create_prompt_with_sync_callback_returns_finalized() -> None:
         ]
     )
 
-    result = await client.characters.create(
+    result = await client.characters.create_from_prompt(
         prompt="a knight",
         on_previews_ready=lambda previews: previews[1]["key"],  # pick second
     )
@@ -103,7 +103,7 @@ async def test_create_prompt_with_sync_callback_returns_finalized() -> None:
 
 
 # ---------------------------------------------------------------------------
-# characters.create — method="prompt" with async callback
+# characters.create_from_prompt — async callback
 # ---------------------------------------------------------------------------
 
 
@@ -120,7 +120,9 @@ async def test_create_prompt_with_async_callback() -> None:
     async def async_picker(previews):
         return previews[0]["key"]
 
-    result = await client.characters.create(prompt="a knight", on_previews_ready=async_picker)
+    result = await client.characters.create_from_prompt(
+        prompt="a knight", on_previews_ready=async_picker
+    )
 
     assert isinstance(result, CreateFromGeneratedImageResult)
     finalize_vars = client._graphql.call_args_list[1][0][1]
@@ -128,7 +130,7 @@ async def test_create_prompt_with_async_callback() -> None:
 
 
 # ---------------------------------------------------------------------------
-# characters.create — name forwarded to finalize call
+# characters.create_from_prompt — name forwarded to finalize call
 # ---------------------------------------------------------------------------
 
 
@@ -142,7 +144,7 @@ async def test_create_prompt_passes_name() -> None:
         ]
     )
 
-    await client.characters.create(
+    await client.characters.create_from_prompt(
         prompt="a warrior",
         name="Warrior",
         on_previews_ready=lambda p: p[0]["key"],
@@ -179,7 +181,7 @@ async def test_generate_from_image_finalizes_with_prompt() -> None:
 
 
 # ---------------------------------------------------------------------------
-# characters.create — method="image" (upload image file, single-step)
+# characters.create_from_image — upload image file, single-step
 # ---------------------------------------------------------------------------
 
 
@@ -198,7 +200,7 @@ async def test_create_image_uploads_and_finalizes(tmp_path) -> None:
     )
 
     with patch("uthana.modules.characters.httpx.AsyncClient", return_value=mock_http):
-        result = await client.characters.create(method="image", file=str(img_file))
+        result = await client.characters.create_from_image(str(img_file))
 
     assert isinstance(result, CreateFromGeneratedImageResult)
     assert result.character["id"] == "c2"
@@ -209,7 +211,7 @@ async def test_create_image_uploads_and_finalizes(tmp_path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# characters.create — method="image" raises when file is missing
+# characters.create_from_image — raises when file is missing
 # ---------------------------------------------------------------------------
 
 
@@ -219,7 +221,7 @@ async def test_create_image_raises_without_file() -> None:
 
     client = _make_client()
     with pytest.raises(UthanaError):
-        await client.characters.create(method="image")  # type: ignore[call-overload]
+        await client.characters.create_from_image("")
 
 
 # ---------------------------------------------------------------------------

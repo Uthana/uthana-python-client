@@ -143,7 +143,7 @@ uthana_client = Uthana("your-api-key")
 
 async def manage_characters():
     # Upload and auto-rig a character from a file
-    output = await uthana_client.characters.create(file="path/to/character.glb")
+    output = await uthana_client.characters.create_from_file("path/to/character.glb")
     print(output.character_id)
     print(output.auto_rig_confidence)  # 0–1.0, higher is better
 
@@ -157,7 +157,7 @@ async def manage_characters():
         print(c.get("id"), c.get("name"))
 
     # Text-to-character: one-shot with callback
-    result = await uthana_client.characters.create(
+    result = await uthana_client.characters.create_from_prompt(
         prompt="a knight in shining armor",
         name="Knight",
         on_previews_ready=lambda previews: previews[0]["key"],
@@ -165,21 +165,18 @@ async def manage_characters():
     print(result.character.get("id"))
 
     # Text-to-character: async callback (e.g. show a UI and return the chosen key)
-    result = await uthana_client.characters.create(
+    result = await uthana_client.characters.create_from_prompt(
         prompt="a futuristic soldier",
         on_previews_ready=lambda previews: show_picker_ui(previews),
     )
 
     # Text-to-character: two-step (inspect previews before confirming)
-    pending = await uthana_client.characters.create(prompt="a futuristic soldier")
+    pending = await uthana_client.characters.create_from_prompt(prompt="a futuristic soldier")
     # pending.previews is a list of {"key": ..., "url": ...} — show them to the user
     result = await uthana_client.characters.generate_from_image(pending, pending.previews[0]["key"])
 
     # Image-to-character: upload an image file (always one-shot)
-    result = await uthana_client.characters.create(
-        method="image",
-        file="path/to/reference.png",
-    )
+    result = await uthana_client.characters.create_from_image("path/to/reference.png")
 
     # Rename or delete
     await uthana_client.characters.rename(result.character["id"], "New name")
@@ -310,6 +307,36 @@ Integration tests (`tests/test_client.py`) require `UTHANA_API_KEY`. Use `.env.l
 UTHANA_API_KEY=your_key
 UTHANA_DOMAIN=custom.uthana.com  # optional, for non-production
 ```
+
+## Releasing and PyPI
+
+Maintainers publish to [PyPI](https://pypi.org/project/uthana/) from GitHub Actions.
+
+**When it runs**
+
+- **Tag push:** push an annotated tag matching `v*` (for example `v1.2.3`). The workflow validates the tag, builds the wheel/sdist, and uploads to PyPI.
+- **Manual run:** GitHub → **Actions** → **Release** → **Run workflow**. Prefer tagging from git so `GITHUB_REF` is the tag; the job expects a release tag and a `pyproject.toml` version that matches the tag.
+
+**Version alignment**
+
+Before tagging, bump `version` in `pyproject.toml` to match the release. The helper script can create the tag and sync the version in one step:
+
+```bash
+python scripts/release.py prepare --version 1.2.3
+git push origin "$(git branch --show-current)" --follow-tags
+```
+
+CI runs `scripts/release.py check-tag` automatically on tag builds; you normally do not run that locally except when debugging the workflow.
+
+**PyPI authentication**
+
+The workflow uses **Trusted Publishing (OIDC)**: the `id-token: write` permission lets `pypa/gh-action-pypi-publish` authenticate to PyPI without a long-lived token. In the PyPI project settings, add this GitHub repository as a [trusted publisher](https://docs.pypi.org/trusted-publishers/) (environment: `release` or the default GitHub Actions OIDC audience, per PyPI’s wizard).
+
+**Alternative:** disable OIDC in the workflow, add a repository secret named `PYPI_API_TOKEN` (API token from PyPI), and configure the publish step with `password: ${{ secrets.PYPI_API_TOKEN }}` per [gh-action-pypi-publish](https://github.com/pypa/gh-action-pypi-publish).
+
+## Type hints
+
+The package ships an empty `py.typed` marker ([PEP 561](https://peps.python.org/pep-0561/)) so type checkers treat `uthana` as providing inline types. Keep `src/uthana/py.typed` in the repo and in package data (`pyproject.toml`).
 
 ## Custom domain
 
