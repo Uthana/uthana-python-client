@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # Trusted Publishing to PyPI (OIDC). Configure the PyPI project with this repo as a trusted publisher.
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate tag format and version sync
+        id: validate_release
+        run: python scripts/release.py check-tag --tag "${GITHUB_REF_NAME}" --github-output "${GITHUB_OUTPUT}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: uv build
+
+      # Uses OIDC (id-token above). Alternative: remove id-token, set secrets.PYPI_API_TOKEN on the repo,
+      # and pass password: ${{ secrets.PYPI_API_TOKEN }} to this action.
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

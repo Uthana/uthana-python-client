@@ -11,3 +11,9 @@ wheels/
 
 # test artifacts
 tests/artifacts
+
+# Env (API keys, domain overrides)
+.env
+.env.local
+.env.*.local
+.DS_Store
