@@ -318,6 +318,80 @@ async def test_bake_with_changes_uses_provided_character_id() -> None:
 
 
 # ---------------------------------------------------------------------------
+# motions.create_locomotion / list_locomotion_styles
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_locomotion_returns_result_and_variables() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"motion": {"id": "m-loco", "name": "Loco Walk"}})
+
+    result = await client.motions.create_locomotion(
+        UthanaCharacters.tar,
+        strides=2,
+        move_speed=1.3,
+        style_id="neutral_male_a",
+        travel_angle=0.0,
+    )
+
+    assert result.character_id == UthanaCharacters.tar
+    assert result.motion_id == "m-loco"
+    call_query, call_vars = client._graphql.call_args[0][0], client._graphql.call_args[0][1]
+    assert "create_locomotion" in call_query
+    assert call_vars["character_id"] == UthanaCharacters.tar
+    assert call_vars["strides"] == 2
+    assert call_vars["move_speed"] == 1.3
+    assert call_vars["style_id"] == "neutral_male_a"
+    assert call_vars["travel_angle"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_create_locomotion_omits_optional_when_none() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"motion": {"id": "m1"}})
+
+    await client.motions.create_locomotion(UthanaCharacters.tar)
+
+    call_vars = client._graphql.call_args[0][1]
+    assert call_vars == {"character_id": UthanaCharacters.tar}
+    assert "strides" not in call_vars
+
+
+@pytest.mark.asyncio
+async def test_create_locomotion_raises_without_motion_id() -> None:
+    from uthana.types import UthanaError
+
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"motion": {}})
+
+    with pytest.raises(UthanaError, match="create_locomotion did not return motion id"):
+        await client.motions.create_locomotion(UthanaCharacters.tar)
+
+
+@pytest.mark.asyncio
+async def test_list_locomotion_styles_returns_list() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value=["neutral_male_a", "neutral_female_a"])
+
+    styles = await client.motions.list_locomotion_styles()
+
+    assert styles == ["neutral_male_a", "neutral_female_a"]
+    call_query = client._graphql.call_args[0][0]
+    assert "locomotion_styles" in call_query
+
+
+@pytest.mark.asyncio
+async def test_list_locomotion_styles_empty_default() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value=[])
+
+    styles = await client.motions.list_locomotion_styles()
+
+    assert styles == []
+
+
+# ---------------------------------------------------------------------------
 # jobs.list — timestamp normalization (created_at/started_at/ended_at → public names)
 # ---------------------------------------------------------------------------
 

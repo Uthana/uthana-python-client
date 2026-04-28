@@ -234,6 +234,35 @@ mutation create_motion_from_gltf($gltf: String!, $motionName: String!, $characte
 }
 """
 
+    CREATE_LOCOMOTION = """
+mutation CreateLocomotion(
+    $character_id: String!,
+    $strides: Int,
+    $move_speed: Float,
+    $style_id: String,
+    $travel_angle: Float
+) {
+    create_locomotion(
+        character_id: $character_id,
+        strides: $strides,
+        move_speed: $move_speed,
+        style_id: $style_id,
+        travel_angle: $travel_angle
+    ) {
+        motion {
+            id
+            name
+        }
+    }
+}
+"""
+
+    LOCOMOTION_STYLES = """
+query LocomotionStyles {
+    locomotion_styles
+}
+"""
+
     UPDATE_MOTION = """
 mutation update_motion($id: String!, $name: String, $deleted: Boolean) {
     update_motion(id: $id, name: $name, deleted: $deleted) {

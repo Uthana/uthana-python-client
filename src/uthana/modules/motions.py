@@ -1,6 +1,6 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
-"""Motion management: list, download, delete, rename, favorite, bake."""
+"""Motion management: list, download, delete, rename, favorite, bake, locomotion."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from ._base import _BaseModule
 
 
 class MotionsModule(_BaseModule):
-    """Motion management: list, download, delete, rename, favorite, bake."""
+    """Motion management: list, download, delete, rename, favorite, bake, locomotion."""
 
     async def list(self) -> list[Motion]:
         """List all motions for the authenticated user."""
@@ -169,3 +169,77 @@ class MotionsModule(_BaseModule):
         return asyncio.run(
             self.bake_with_changes(gltf_content, motion_name, character_id=character_id)
         )
+
+    async def create_locomotion(
+        self,
+        character_id: str,
+        *,
+        strides: int | None = None,
+        move_speed: float | None = None,
+        style_id: str | None = None,
+        travel_angle: float | None = None,
+    ) -> TextToMotionResult:
+        """Generate controllable locomotion for a character.
+
+        See `https://uthana.com/docs/api/capabilities/locomotion` for full details.
+
+        Optional parameters use API defaults when omitted:
+
+        - **strides**: number of full stride pairs (1–5; default 4).
+        - **move_speed**: speed in m/s (0.25–8.0; default 1.2; recommended up to 6.0).
+        - **style_id**: from :meth:`list_locomotion_styles` (default ``neutral_male_a``).
+        - **travel_angle**: direction in degrees on the ground plane, -180 to 180
+          (0 forward, 90 right; default 0.0).
+
+        Returns ``character_id`` and ``motion_id`` like text-to-motion.
+        """
+        variables: dict[str, object] = {"character_id": character_id}
+        if strides is not None:
+            variables["strides"] = strides
+        if move_speed is not None:
+            variables["move_speed"] = move_speed
+        if style_id is not None:
+            variables["style_id"] = style_id
+        if travel_angle is not None:
+            variables["travel_angle"] = travel_angle
+
+        data = await self._client._graphql(q.CREATE_LOCOMOTION, variables, path="create_locomotion")
+        data = data or {}
+        motion = data.get("motion") or {}
+        motion_id = motion.get("id")
+        if not motion_id:
+            raise UthanaError(400, "create_locomotion did not return motion id")
+        return TextToMotionResult(character_id=character_id, motion_id=motion_id)
+
+    def create_locomotion_sync(
+        self,
+        character_id: str,
+        *,
+        strides: int | None = None,
+        move_speed: float | None = None,
+        style_id: str | None = None,
+        travel_angle: float | None = None,
+    ) -> TextToMotionResult:
+        """Generate locomotion for a character (sync)."""
+        return asyncio.run(
+            self.create_locomotion(
+                character_id,
+                strides=strides,
+                move_speed=move_speed,
+                style_id=style_id,
+                travel_angle=travel_angle,
+            )
+        )
+
+    async def list_locomotion_styles(self) -> List[str]:
+        """Return all ``style_id`` values accepted by :meth:`create_locomotion`."""
+        return await self._client._graphql(
+            q.LOCOMOTION_STYLES,
+            path="locomotion_styles",
+            path_default=[],
+            return_type=List[str],
+        )
+
+    def list_locomotion_styles_sync(self) -> List[str]:
+        """Return locomotion style IDs (sync)."""
+        return asyncio.run(self.list_locomotion_styles())
