@@ -1,6 +1,6 @@
 [project]
 name = "uthana"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Python client for Uthana: generate lifelike human motion from text or 2D video, create and auto-rig characters, and manage your motions."
 readme = "README.md"
 license = "Apache-2.0"

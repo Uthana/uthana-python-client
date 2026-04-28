@@ -66,7 +66,7 @@ uthana_client = Uthana("your-api-key")
 
 
 async def text_to_motion():
-    # Basic usage (model defaults from models.ini)
+    # Basic usage (model defaults from models.toml)
     output = await uthana_client.ttm.create("a person walking forward")
     print(output.character_id, output.motion_id)
 
@@ -96,6 +96,36 @@ async def text_to_motion():
 
 
 asyncio.run(text_to_motion())
+```
+
+## Locomotion
+
+[Docs: Locomotion](https://uthana.com/docs/api/capabilities/locomotion)
+
+Generate controllable, loopable travel motion for a character (stride count, speed, style, direction).
+
+```python
+import asyncio
+from uthana import Uthana, UthanaCharacters
+
+uthana_client = Uthana("your-api-key")
+
+
+async def locomotion_example():
+    styles = await uthana_client.motions.list_locomotion_styles()
+    print("Available style_id values:", styles)
+
+    output = await uthana_client.motions.create_locomotion(
+        UthanaCharacters.tar,
+        strides=2,
+        move_speed=1.3,
+        style_id="neutral_male_a",
+        travel_angle=0,
+    )
+    print(output.character_id, output.motion_id)
+
+
+asyncio.run(locomotion_example())
 ```
 
 ## Video to motion (vtm)
