@@ -231,15 +231,15 @@ class MotionsModule(_BaseModule):
             )
         )
 
-    async def list_locomotion_styles(self) -> list[str]:
+    async def list_locomotion_styles(self) -> List[str]:
         """Return all ``style_id`` values accepted by :meth:`create_locomotion`."""
         return await self._client._graphql(
             q.LOCOMOTION_STYLES,
             path="locomotion_styles",
             path_default=[],
-            return_type=list[str],
+            return_type=List[str],
         )
 
-    def list_locomotion_styles_sync(self) -> list[str]:
+    def list_locomotion_styles_sync(self) -> List[str]:
         """Return locomotion style IDs (sync)."""
         return asyncio.run(self.list_locomotion_styles())
