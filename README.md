@@ -342,27 +342,36 @@ UTHANA_DOMAIN=custom.uthana.com  # optional, for non-production
 
 Maintainers publish to [PyPI](https://pypi.org/project/uthana/) from GitHub Actions.
 
-**When it runs**
+**Release flow**
 
-- **Tag push:** push an annotated tag matching `v*` (for example `v1.2.3`). The workflow validates the tag, builds the wheel/sdist, and uploads to PyPI.
-- **Manual run:** GitHub → **Actions** → **Release** → **Run workflow**. Prefer tagging from git so `GITHUB_REF` is the tag; the job expects a release tag and a `pyproject.toml` version that matches the tag.
-
-**Version alignment**
-
-Before tagging, bump `version` in `pyproject.toml` to match the release. The helper script can create the tag and sync the version in one step:
+Prepare the version/tag, push it, then verify GitHub can see the tag:
 
 ```bash
-python scripts/release.py prepare --version 1.2.3
-git push origin "$(git branch --show-current)" --follow-tags
+uv run python scripts/release.py prepare --version 1.2.3
+uv run python scripts/release.py push
+uv run python scripts/release.py verify
 ```
 
-CI runs `scripts/release.py check-tag` automatically on tag builds; you normally do not run that locally except when debugging the workflow.
+Shorthands: `make release-prepare VERSION=…`, `make release-push`, `make release-verify`.
 
-**PyPI authentication**
+**Checks and dry-runs**
 
-The workflow uses **Trusted Publishing (OIDC)**: the `id-token: write` permission lets `pypa/gh-action-pypi-publish` authenticate to PyPI without a long-lived token. In the PyPI project settings, add this GitHub repository as a [trusted publisher](https://docs.pypi.org/trusted-publishers/) (environment: `release` or the default GitHub Actions OIDC audience, per PyPI’s wizard).
+- `verify` checks `pyproject.toml`, the local `v*` tag at `HEAD`, and the tag on `origin`. Use `--skip-remote-check` before pushing, or `SKIP_RELEASE_TAG_CHECK=1` to bypass.
+- `uv run python scripts/release.py push --dry-run` previews the branch/tag push.
+- `publish` deletes **`dist/`** before **`uv build`** so leftover wheels (e.g. an old **0.2.0**) are not uploaded next to the current version.
+- `uv run python scripts/release.py publish --dry-run` builds and validates a PyPI upload without uploading. Add `--index testpypi` for TestPyPI.
 
-**Alternative:** disable OIDC in the workflow, add a repository secret named `PYPI_API_TOKEN` (API token from PyPI), and configure the publish step with `password: ${{ secrets.PYPI_API_TOKEN }}` per [gh-action-pypi-publish](https://github.com/pypa/gh-action-pypi-publish).
+**Auth and TestPyPI**
+
+The release workflow uses PyPI **Trusted Publishing (OIDC)**. Add this repo as a trusted publisher on both [PyPI](https://pypi.org/) and [TestPyPI](https://test.pypi.org/) if you use both. For TestPyPI, run **Actions → Release → Run workflow** and enable **Upload to TestPyPI**.
+
+For local uploads, set `UV_PUBLISH_TOKEN` from the target index, then run:
+
+```bash
+UV_PUBLISH_TOKEN=your_token uv run python scripts/release.py publish --index testpypi
+```
+
+Production is the default (`--index pypi`), but routine production releases should use tag push → CI.
 
 ## Type hints
 

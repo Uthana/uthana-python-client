@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck precommit-install precommit test release-prepare
+.PHONY: install lint format typecheck precommit-install precommit test release-prepare release-push release-verify release-publish-dry-run release-publish-testpypi-dry-run
 
 install:
 	uv sync
@@ -27,3 +27,15 @@ release-prepare:
 		exit 1; \
 	fi
 	uv run python scripts/release.py prepare --version "$(VERSION)"
+
+release-push:
+	uv run python scripts/release.py push
+
+release-verify:
+	uv run python scripts/release.py verify
+
+release-publish-dry-run:
+	uv run python scripts/release.py publish --dry-run
+
+release-publish-testpypi-dry-run:
+	uv run python scripts/release.py publish --dry-run --index testpypi
