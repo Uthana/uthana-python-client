@@ -61,13 +61,17 @@ mutation CreateCharacter(
     $name: String!,
     $file: Upload!,
     $auto_rig: Boolean,
-    $auto_rig_front_facing: Boolean
+    $auto_rig_front_facing: Boolean,
+    $rerig_target: String,
+    $include_fingers: Boolean
 ) {
     create_character(
         name: $name,
         file: $file,
         auto_rig: $auto_rig,
-        auto_rig_front_facing: $auto_rig_front_facing
+        auto_rig_front_facing: $auto_rig_front_facing,
+        rerig_target: $rerig_target,
+        include_fingers: $include_fingers
     ) {
         character {
             id
@@ -187,13 +191,17 @@ mutation CreateCharacterFromImage(
     $character_id: String!,
     $image_key: String!,
     $prompt: String!,
-    $name: String
+    $name: String,
+    $rerig_target: String,
+    $include_fingers: Boolean
 ) {
     create_character_from_image(
         character_id: $character_id,
         image_key: $image_key,
         prompt: $prompt,
-        name: $name
+        name: $name,
+        rerig_target: $rerig_target,
+        include_fingers: $include_fingers
     ) {
         character {
             id

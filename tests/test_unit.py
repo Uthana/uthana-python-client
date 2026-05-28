@@ -49,11 +49,13 @@ def test_prepare_create_character_glb(tmp_path: Path) -> None:
     path = tmp_path / "model.glb"
     path.write_bytes(b"glTF\x02\x00\x00\x00" + b"\x00" * 12)
     variables, name, ext, filename = prepare_create_character(
-        str(path), auto_rig=True, front_facing=False
+        str(path), auto_rig=True, front_facing=False, rerig_target=None, include_fingers=False
     )
     assert variables["name"] == "model"
     assert variables["auto_rig"] is True
     assert variables["auto_rig_front_facing"] is False
+    assert variables["rerig_target"] is None
+    assert variables["include_fingers"] is False
     assert name == "model"
     assert ext == "glb"
     assert filename == "model.glb"
