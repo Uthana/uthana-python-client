@@ -64,7 +64,7 @@ def test_prepare_create_character_glb(tmp_path: Path) -> None:
 def test_prepare_create_character_fallback_ext(tmp_path: Path) -> None:
     path = tmp_path / "model.xyz"
     path.write_bytes(b"unknown format")
-    variables, name, ext, _ = prepare_create_character(str(path), None, None)
+    variables, name, ext, _ = prepare_create_character(str(path), None, None, None, None)
     assert ext == "xyz"
 
 
