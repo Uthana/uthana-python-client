@@ -41,7 +41,9 @@ class CharactersModule(_BaseModule):
         """Upload a GLB or FBX and optionally auto-rig. Returns CreateCharacterResult."""
         if not file:
             raise UthanaError(400, "file is required (.glb or .fbx)")
-        variables, name, ext, _ = prepare_create_character(file, auto_rig, front_facing, rerig_target, include_fingers)
+        variables, name, ext, _ = prepare_create_character(
+            file, auto_rig, front_facing, rerig_target, include_fingers
+        )
         operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
         with open(file, "rb") as f:
@@ -67,7 +69,13 @@ class CharactersModule(_BaseModule):
     ) -> CreateCharacterResult:
         """Upload a GLB or FBX and optionally auto-rig (sync)."""
         return asyncio.run(
-            self.create_from_file(file, auto_rig=auto_rig, front_facing=front_facing, rerig_target=rerig_target, include_fingers=include_fingers)
+            self.create_from_file(
+                file,
+                auto_rig=auto_rig,
+                front_facing=front_facing,
+                rerig_target=rerig_target,
+                include_fingers=include_fingers,
+            )
         )
 
     @overload

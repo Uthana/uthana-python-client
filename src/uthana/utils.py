@@ -8,7 +8,11 @@ from .types import SUPPORTED_VIDEO_FORMATS, Error, detect_mesh_format
 
 
 def prepare_create_character(
-    file_path: str, auto_rig: bool | None, front_facing: bool | None, rerig_target: str | None, include_fingers: bool | None
+    file_path: str,
+    auto_rig: bool | None,
+    front_facing: bool | None,
+    rerig_target: str | None,
+    include_fingers: bool | None,
 ) -> tuple[dict, str, str, str]:
     """Prepare variables and metadata for create_character mutation."""
     filename = os.path.basename(file_path)
