@@ -2,18 +2,17 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch:
     inputs:
-      use_testpypi:
-        description: "Upload to TestPyPI instead of PyPI (manual runs only; add this repo as a trusted publisher on test.pypi.org)"
+      dry_run:
+        description: "Build and publish --dry-run (no upload to PyPI)"
         type: boolean
-        default: false
+        default: true
 
 permissions:
-  contents: write
-  # Trusted Publishing to PyPI (OIDC). Configure the PyPI project with this repo as a trusted publisher.
+  contents: write  # create + push the release tag, create GitHub Release
+  # PyPI Trusted Publishing (OIDC). Configure the PyPI project with this repo as a trusted publisher.
   id-token: write
 
 jobs:
@@ -22,11 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Validate tag format and version sync
-        id: validate_release
-        if: startsWith(github.ref, 'refs/tags/')
-        run: python scripts/release.py check-tag --tag "${GITHUB_REF_NAME}" --github-output "${GITHUB_OUTPUT}"
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,12 +32,54 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Build package
-        run: uv build
+      - name: Install dependencies
+        run: uv sync
 
-      # Uses OIDC (id-token above). Alternative: remove id-token, set secrets.PYPI_API_TOKEN on the repo,
-      # and pass password: ${{ secrets.PYPI_API_TOKEN }} to this action.
+      - name: Detect release
+        id: detect
+        run: |
+          VERSION=$(python -c "
+          import re, pathlib
+          content = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version = \"([^\"]+)\"', content, re.MULTILINE)
+          print(m.group(1))
+          ")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if curl -sf "https://pypi.org/pypi/uthana/${VERSION}/json" > /dev/null; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is already on PyPI — skipping release."
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is not yet on PyPI — will release."
+          fi
+
+      - name: Run tests
+        if: steps.detect.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+        run: uv run pytest
+
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: ${{ github.event_name == 'workflow_dispatch' && inputs.use_testpypi && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+        if: steps.detect.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            uv run python scripts/release.py publish --dry-run
+          else
+            uv run python scripts/release.py publish
+          fi
+
+      - name: Create and push release tag
+        if: steps.detect.outputs.should_release == 'true' && github.event_name != 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.detect.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        if: steps.detect.outputs.should_release == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.detect.outputs.version }}" \
+            --title "v${{ steps.detect.outputs.version }}" \
+            --generate-notes

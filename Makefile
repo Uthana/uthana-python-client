@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck precommit-install precommit test release-prepare release-push release-verify release-publish-dry-run release-publish-testpypi-dry-run
+.PHONY: install lint format typecheck precommit-install precommit test set-version release-publish-dry-run release-publish
 
 install:
 	uv sync
@@ -21,21 +21,15 @@ precommit:
 test:
 	uv run pytest
 
-release-prepare:
+set-version:
 	@if [ -z "$(VERSION)" ]; then \
-		echo "Usage: make release-prepare VERSION=MAJOR.MINOR.PATCH[-rc.N]"; \
+		echo "Usage: make set-version VERSION=MAJOR.MINOR.PATCH[-rc.N]"; \
 		exit 1; \
 	fi
-	uv run python scripts/release.py prepare --version "$(VERSION)"
-
-release-push:
-	uv run python scripts/release.py push
-
-release-verify:
-	uv run python scripts/release.py verify
+	uv run python scripts/set_version.py "$(VERSION)"
 
 release-publish-dry-run:
 	uv run python scripts/release.py publish --dry-run
 
-release-publish-testpypi-dry-run:
-	uv run python scripts/release.py publish --dry-run --index testpypi
+release-publish:
+	uv run python scripts/release.py publish

@@ -340,38 +340,45 @@ UTHANA_DOMAIN=custom.uthana.com  # optional, for non-production
 
 ## Releasing and PyPI
 
-Maintainers publish to [PyPI](https://pypi.org/project/uthana/) from GitHub Actions.
+The `uthana` package is published automatically. The workflow is:
 
-**Release flow**
+1. In a PR, run `make set-version VERSION=1.2.3` to bump `pyproject.toml`, then commit and merge.
+2. On merge to `main`, **`.github/workflows/release.yml`** detects that the new version is not yet on PyPI, runs tests, publishes via OIDC, and creates the `v1.2.3` git tag and GitHub Release.
 
-Prepare the version/tag, push it, then verify GitHub can see the tag:
+Re-merging the same version is a no-op — the workflow checks PyPI before doing anything.
 
-```bash
-uv run python scripts/release.py prepare --version 1.2.3
-uv run python scripts/release.py push
-uv run python scripts/release.py verify
-```
-
-Shorthands: `make release-prepare VERSION=…`, `make release-push`, `make release-verify`.
-
-**Checks and dry-runs**
-
-- `verify` checks `pyproject.toml`, the local `v*` tag at `HEAD`, and the tag on `origin`. Use `--skip-remote-check` before pushing, or `SKIP_RELEASE_TAG_CHECK=1` to bypass.
-- `uv run python scripts/release.py push --dry-run` previews the branch/tag push.
-- `publish` deletes **`dist/`** before **`uv build`** so leftover wheels (e.g. an old **0.2.0**) are not uploaded next to the current version.
-- `uv run python scripts/release.py publish --dry-run` builds and validates a PyPI upload without uploading. Add `--index testpypi` for TestPyPI.
-
-**Auth and TestPyPI**
-
-The release workflow uses PyPI **Trusted Publishing (OIDC)**. Add this repo as a trusted publisher on both [PyPI](https://pypi.org/) and [TestPyPI](https://test.pypi.org/) if you use both. For TestPyPI, run **Actions → Release → Run workflow** and enable **Upload to TestPyPI**.
-
-For local uploads, set `UV_PUBLISH_TOKEN` from the target index, then run:
+### Bump version in a branch
 
 ```bash
-UV_PUBLISH_TOKEN=your_token uv run python scripts/release.py publish --index testpypi
+make set-version VERSION=1.2.3
 ```
 
-Production is the default (`--index pypi`), but routine production releases should use tag push → CI.
+Writes `1.2.3` to `pyproject.toml`. No git operations — just commit and open a PR.
+
+### Manual publish (fallback if CI fails)
+
+```bash
+make release-publish-dry-run   # build + simulate, no upload
+make release-publish           # build + publish for real
+```
+
+Both require a PyPI API token. Set `UV_PUBLISH_TOKEN` from your [PyPI account](https://pypi.org/manage/account/token/) then run the command. For TestPyPI, run directly:
+
+```bash
+uv run python scripts/release.py publish --dry-run --index testpypi
+uv run python scripts/release.py publish --index testpypi
+```
+
+After a successful manual publish, create the git tag manually if CI did not:
+
+```bash
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin v1.2.3
+```
+
+### Auth: PyPI Trusted Publishing (OIDC)
+
+The release workflow uses PyPI **Trusted Publishers** (OIDC) — no `PYPI_API_TOKEN` secret required. The Trusted Publisher must be configured on [pypi.org](https://pypi.org/manage/project/uthana/settings/publishing/) for this repository and workflow file (`release.yml`).
 
 ## Type hints
 
