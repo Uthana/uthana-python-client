@@ -66,7 +66,7 @@ uthana_client = Uthana("your-api-key")
 
 
 async def text_to_motion():
-    # Basic usage (model defaults from models.toml)
+    # Basic usage (default model: text-to-motion-1.0)
     output = await uthana_client.ttm.create("a person walking forward")
     print(output.character_id, output.motion_id)
 
@@ -79,7 +79,7 @@ async def text_to_motion():
     # Explicit model and advanced options
     output = await uthana_client.ttm.create(
         "a person waving hello",
-        model="diffusion-v2",
+        model="text-to-motion-2.0",
         character_id=UthanaCharacters.manny,
         length=5.0,
         cfg_scale=2.5,
@@ -97,6 +97,43 @@ async def text_to_motion():
 
 asyncio.run(text_to_motion())
 ```
+
+**Available models:** `text-to-motion-1.0` (default), `text-to-motion-2.0`.
+
+## Text to motion 3.0 async job (ttm.create_job)
+
+`text-to-motion-3.0` runs as an async job and returns a job dict to poll — the same pattern as video-to-motion. Access is org-gated server-side.
+
+```python
+import asyncio
+from uthana import Uthana, UthanaCharacters
+
+uthana_client = Uthana("your-api-key")
+
+
+async def ttm_async_job():
+    # Submit the job
+    job = await uthana_client.ttm.create_job(
+        "a person doing jumping jacks",
+        model="text-to-motion-3.0",
+        length=8,            # optional, 4–10 seconds
+        rewrite_prompt=True, # optional, default True
+        character_id=UthanaCharacters.tar,  # optional
+    )
+
+    # Poll until finished
+    while job["status"] not in ("FINISHED", "FAILED"):
+        await asyncio.sleep(5)
+        job = await uthana_client.jobs.get(job["id"])
+    if job["status"] == "FINISHED":
+        motion_id = job["result"]["result"]["id"]
+        print(motion_id)
+
+
+asyncio.run(ttm_async_job())
+```
+
+Sync variant: `uthana_client.ttm.create_job_sync(...)`.
 
 ## Locomotion
 
@@ -142,7 +179,14 @@ uthana_client = Uthana("your-api-key")
 
 
 async def video_to_motion():
+    # Default model: video-to-motion-2.0 (single base motion)
     job = await uthana_client.vtm.create("path/to/dance.mp4", motion_name="my_dance")
+
+    # Use video-to-motion-2.1 for DCM refinement motion IDs
+    # job = await uthana_client.vtm.create(
+    #     "path/to/dance.mp4", motion_name="my_dance", model="video-to-motion-2.1"
+    # )
+
     while job["status"] not in ("FINISHED", "FAILED"):
         await asyncio.sleep(5)  # Non-blocking; other tasks can run while waiting
         job = await uthana_client.jobs.get(job["id"])
@@ -157,6 +201,8 @@ async def video_to_motion():
 
 asyncio.run(video_to_motion())
 ```
+
+**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`.
 
 ## Characters
 

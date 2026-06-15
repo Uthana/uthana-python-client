@@ -148,7 +148,7 @@ def test_ttm_auto_resolves_to_default(
         seed=None,
         internal_ik=None,
     )
-    assert variables["model"] == "text-to-motion"  # vqvae-v1 uses this
+    assert variables["model"] == "text-to-motion"  # text-to-motion-1.0 shimmed to this
 
 
 @patch.object(Uthana, "_log_init", return_value={})

@@ -200,12 +200,13 @@ class Uthana:
         prompt: str,
         character_id: str | None,
         foot_ik: bool | None,
+        model: str,
     ) -> dict:
-        """Build variables for vqvae-v1 text-to-motion mutation."""
+        """Build variables for text-to-motion-1.0 mutation."""
         return {
             "prompt": prompt,
             "character_id": character_id,
-            "model": "text-to-motion",
+            "model": model,
             "foot_ik": foot_ik,
         }
 
@@ -219,12 +220,13 @@ class Uthana:
         length: float | None,
         seed: int | None,
         internal_ik: bool | None,
+        model: str,
     ) -> dict:
-        """Build variables for diffusion-v2 text-to-motion mutation."""
+        """Build variables for text-to-motion-2.0 mutation."""
         return {
             "prompt": prompt,
             "character_id": character_id,
-            "model": "text-to-motion-bucmd",
+            "model": model,
             "foot_ik": foot_ik,
             "cfg_scale": cfg_scale,
             "length": length,
@@ -244,15 +246,18 @@ class Uthana:
         seed: int | None,
         internal_ik: bool | None,
     ) -> tuple[str, dict]:
-        """Resolve model, build variables, and return mutation + variables for Ttm."""
+        """Normalize model, route to the correct mutation, and build variables."""
+        from .utils import normalize_model_name
+
         if model == "auto":
             model = cast(ModelType, models.ttm.default)
-        if model == "vqvae-v1":
+        canonical = normalize_model_name(str(model))
+        if canonical == "text-to-motion":
             variables = self._prepare_text_to_motion_vqvae_v1(
-                prompt=prompt, character_id=character_id, foot_ik=foot_ik
+                prompt=prompt, character_id=character_id, foot_ik=foot_ik, model=canonical
             )
             return q.TEXT_TO_MOTION_VQVAE_V1, variables
-        elif model == "diffusion-v2":
+        elif canonical == "text-to-motion-bucmd":
             variables = self._prepare_text_to_motion_diffusion_v2(
                 prompt=prompt,
                 character_id=character_id,
@@ -261,11 +266,13 @@ class Uthana:
                 length=length,
                 seed=seed,
                 internal_ik=internal_ik,
+                model=canonical,
             )
             return q.TEXT_TO_MOTION_DIFFUSION_V2, variables
         else:
             raise ValueError(
-                f"Unknown model: {model!r}. Must be 'auto', 'vqvae-v1', or 'diffusion-v2'."
+                f"Unknown model: {model!r}. Must be one of: text-to-motion-1.0, text-to-motion-2.0,"
+                " vqvae-v1, diffusion-v2, text-to-motion, text-to-motion-bucmd."
             )
 
 

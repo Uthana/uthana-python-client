@@ -5,9 +5,12 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
+from ..graphql import q
 from ..models import models
-from ..types import TextToMotionResult, TtmModelType, UthanaCharacters
+from ..types import Job, TextToMotionResult, TtmJobModelType, TtmModelType, UthanaCharacters
+from ..utils import normalize_model_name
 from ._base import _BaseModule
 
 
@@ -28,12 +31,11 @@ class TtmModule(_BaseModule):
     ) -> TextToMotionResult:
         """Generate a 3D character animation from a natural language prompt.
 
-        Model defaults to the value in models.toml when omitted or set to \"auto\".
+        Model defaults to the value in models.toml when omitted or set to "auto".
         """
-        if model is None:
-            model = models.ttm.default
+        resolved: str = normalize_model_name(model) if model is not None else models.ttm.default
         mutation, variables = self._client._prepare_and_select_text_to_motion(
-            model=model,
+            model=cast(TtmModelType, resolved),
             prompt=prompt,
             character_id=character_id,
             foot_ik=foot_ik,
@@ -72,4 +74,51 @@ class TtmModule(_BaseModule):
                 seed=seed,
                 internal_ik=internal_ik,
             ),
+        )
+
+    async def create_job(
+        self,
+        prompt: str,
+        *,
+        model: TtmJobModelType,
+        character_id: str | None = None,
+        length: float | None = None,
+        rewrite_prompt: bool | None = None,
+    ) -> Job:
+        """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
+
+        Access is org-gated server-side; the server returns an error if the caller's org is not
+        whitelisted.
+        """
+        variables = {
+            "prompt": prompt,
+            "model": normalize_model_name(model),
+            "character_id": character_id,
+            "length": length,
+            "rewrite_prompt": rewrite_prompt,
+        }
+        data = await self._client._graphql(
+            q.CREATE_TEXT_TO_MOTION_JOB, variables, path="create_text_to_motion_job.job"
+        )
+        return cast(Job, data)
+
+    def create_job_sync(
+        self,
+        prompt: str,
+        *,
+        model: TtmJobModelType,
+        character_id: str | None = None,
+        length: float | None = None,
+        rewrite_prompt: bool | None = None,
+    ) -> Job:
+        """Submit an async text-to-motion job (TTM 3.0), blocking. Returns a Job to poll via
+        jobs.get_sync()."""
+        return asyncio.run(
+            self.create_job(
+                prompt,
+                model=model,
+                character_id=character_id,
+                length=length,
+                rewrite_prompt=rewrite_prompt,
+            )
         )

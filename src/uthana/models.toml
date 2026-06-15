@@ -2,9 +2,9 @@
 # The first model in each list is used when model="auto".
 
 [ttm]
-default = "vqvae-v1"
-models = ["vqvae-v1", "diffusion-v2", "flow-matching-v1", "nearest-neighbor-v1"]
+default = "text-to-motion-1.0"
+models = ["text-to-motion-1.0", "text-to-motion-2.0"]
 
 [vtm]
-default = "video-to-motion-v1"
-models = ["video-to-motion-v1", "video-to-motion-v2"]
+default = "video-to-motion-2.0"
+models = ["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2"]

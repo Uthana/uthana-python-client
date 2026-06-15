@@ -13,7 +13,7 @@ import httpx
 from ..graphql import q
 from ..models import models
 from ..types import VideoToMotionResult, VtmModelType
-from ..utils import prepare_video_to_motion
+from ..utils import normalize_model_name, prepare_video_to_motion
 from ._base import _BaseModule
 
 
@@ -34,7 +34,7 @@ class VtmModule(_BaseModule):
         variables, filename = prepare_video_to_motion(file_path, motion_name)
         if model is None:
             model = models.vtm.default
-        variables["model"] = model
+        variables["model"] = normalize_model_name(model)
         operations = json.dumps({"query": q.CREATE_VIDEO_TO_MOTION, "variables": variables})
         map_data = json.dumps({"0": ["variables.file"]})
 
