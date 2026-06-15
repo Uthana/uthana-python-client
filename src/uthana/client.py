@@ -252,12 +252,12 @@ class Uthana:
         if model == "auto":
             model = cast(ModelType, models.ttm.default)
         canonical = normalize_model_name(str(model))
-        if canonical == "text-to-motion-1.0":
+        if canonical == "text-to-motion":
             variables = self._prepare_text_to_motion_vqvae_v1(
                 prompt=prompt, character_id=character_id, foot_ik=foot_ik, model=canonical
             )
             return q.TEXT_TO_MOTION_VQVAE_V1, variables
-        elif canonical == "text-to-motion-2.0":
+        elif canonical == "text-to-motion-bucmd":
             variables = self._prepare_text_to_motion_diffusion_v2(
                 prompt=prompt,
                 character_id=character_id,
