@@ -75,6 +75,7 @@ class Job(TypedDict, total=False):
     id: str
     status: str
     method: str | None
+    model: str | None
     created: str | None
     started: str | None
     ended: str | None
@@ -131,9 +132,17 @@ VideoToMotionResult = Job
 # -----------------------------------------------------------------------------
 
 
-TtmModelType = Literal["vqvae-v1", "diffusion-v2"]
-VtmModelType = Literal["video-to-motion-v1", "video-to-motion-v2"]
-ModelType = Literal["auto"] | TtmModelType | VtmModelType
+TtmModelType = Literal[
+    "text-to-motion-1.0",
+    "text-to-motion-2.0",
+    "vqvae-v1",
+    "diffusion-v2",
+    "text-to-motion",
+    "text-to-motion-bucmd",
+]
+TtmJobModelType = Literal["text-to-motion-3.0"]
+VtmModelType = Literal["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2"]
+ModelType = Literal["auto"] | TtmModelType | TtmJobModelType | VtmModelType
 OutputFormat = Literal["glb", "fbx"]
 
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"

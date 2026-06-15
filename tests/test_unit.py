@@ -148,7 +148,7 @@ def test_ttm_auto_resolves_to_default(
         seed=None,
         internal_ik=None,
     )
-    assert variables["model"] == "text-to-motion"  # vqvae-v1 uses this
+    assert variables["model"] == "text-to-motion-1.0"  # vqvae-v1 shimmed to this
 
 
 @patch.object(Uthana, "_log_init", return_value={})
@@ -171,7 +171,7 @@ def test_ttm_diffusion_v2_variables(
         seed=42,
         internal_ik=True,
     )
-    assert variables["model"] == "text-to-motion-bucmd"
+    assert variables["model"] == "text-to-motion-2.0"
     assert variables["prompt"] == "dancing"
     assert variables["length"] == 5.0
     assert variables["cfg_scale"] == 7.5

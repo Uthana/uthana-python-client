@@ -6,6 +6,21 @@ import os
 
 from .types import SUPPORTED_VIDEO_FORMATS, Error, detect_mesh_format
 
+# Maps legacy/non-X.Y model strings to their canonical X.Y equivalents.
+# Update this table when the API renames models; no other code changes required.
+LEGACY_MODEL_SHIM: dict[str, str] = {
+    "video-to-motion-v2": "video-to-motion-2.0",
+    "vqvae-v1": "text-to-motion-1.0",
+    "text-to-motion": "text-to-motion-1.0",
+    "diffusion-v2": "text-to-motion-2.0",
+    "text-to-motion-bucmd": "text-to-motion-2.0",
+}
+
+
+def normalize_model_name(model: str) -> str:
+    """Map legacy/non-X.Y model names to their canonical X.Y form."""
+    return LEGACY_MODEL_SHIM.get(model, model)
+
 
 def prepare_create_character(
     file_path: str,

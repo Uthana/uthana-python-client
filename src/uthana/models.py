@@ -47,12 +47,12 @@ class _Models:
             return tuple(value) if value else fallback
 
         self.ttm = _Capability(
-            cast(TtmModelType, _get("ttm", "default", "vqvae-v1")),
-            _models("ttm", ("vqvae-v1", "diffusion-v2", "flow-matching-v1", "nearest-neighbor-v1")),
+            cast(TtmModelType, _get("ttm", "default", "text-to-motion-1.0")),
+            _models("ttm", ("text-to-motion-1.0", "text-to-motion-2.0")),
         )
         self.vtm = _Capability(
-            cast(VtmModelType, _get("vtm", "default", "video-to-motion-v1")),
-            _models("vtm", ("video-to-motion-v1", "video-to-motion-v2")),
+            cast(VtmModelType, _get("vtm", "default", "video-to-motion-2.0")),
+            _models("vtm", ("video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2")),
         )
 
 
