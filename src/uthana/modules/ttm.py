@@ -87,8 +87,7 @@ class TtmModule(_BaseModule):
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
 
-        Access is org-gated server-side; the server returns an error if the caller's org is not
-        whitelisted.
+        Available to any account on the pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
         """
         variables = {
             "prompt": prompt,
@@ -111,8 +110,11 @@ class TtmModule(_BaseModule):
         length: float | None = None,
         rewrite_prompt: bool | None = None,
     ) -> Job:
-        """Submit an async text-to-motion job (TTM 3.0), blocking. Returns a Job to poll via
-        jobs.get_sync()."""
+        """Submit an async text-to-motion job (TTM 3.0), blocking.
+
+        Returns a Job to poll via jobs.get_sync(). Available to any account on the
+        pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
+        """
         return asyncio.run(
             self.create_job(
                 prompt,
