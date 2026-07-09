@@ -102,7 +102,7 @@ asyncio.run(text_to_motion())
 
 ## Text to motion 3.0 async job (ttm.create_job)
 
-`text-to-motion-3.0` runs as an async job and returns a job dict to poll — the same pattern as video-to-motion. Access is org-gated server-side.
+`text-to-motion-3.0` runs as an async job and returns a job dict to poll — the same pattern as video-to-motion. Available to any account on the [pay-as-you-go plan](https://uthana.com/docs/api/pricing).
 
 ```python
 import asyncio
