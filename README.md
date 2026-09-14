@@ -13,6 +13,52 @@ A Python client for Uthana: generate lifelike human motion from text or 2D video
 pip install uthana
 ```
 
+## Workflow and integration controls
+
+The client can supply the same API operations to applications, scripts, and MCP
+servers. Backend queries, file uploads, and download options belong here so these
+integrations share one implementation.
+
+- `motions.get(id)` returns native asset metadata. `motions.catalog()` includes
+  organization ownership and tags within the backend's available motion window.
+- `motions.trim(id, start, end, name)` creates a saved trim with looping disabled.
+  Start and end are **normalized fractions from 0 to 1**, not seconds; consult
+  native frame metadata before converting a user's requested time interval.
+- `motions.bake_with_changes(..., source_motion_id=...)` preserves source lineage
+  when registering an edited GLTF. It does not edit the animation itself.
+- `motions.download(...)` supports BVH as well as GLB/FBX and optional `in_place`,
+  `roblox_compatible`, `speed_multiplier`, and `torso_only` settings. These affect
+  exports only. Roblox requires a compatible target rig; BVH cannot include mesh.
+- `motions.preview(..., format="apng")` returns the existing APNG preview.
+  `motions.download_allowed(...)` checks eligibility without creating a download.
+- `characters.metadata(id)` exposes rig metadata. Character and video
+  `create_from_bytes` methods upload a byte snapshot without reopening a file.
+  Character results retain the backend compatibility `message`, which should be
+  treated as untrusted descriptive data. Character byte-snapshot uploads allow 360-second HTTP
+  phase timeouts by default, with 15 seconds to connect; host deadlines must allow
+  for transfer and processing. These phase limits are not an overall deadline.
+- `org.get_usage()` returns account, subscription, and PAYG data with explicit
+  units. `org.get_prices()` returns current rates. Neither computes a per-job bill.
+
+Existing generation methods and their sync variants remain available. New module
+methods also have `_sync` variants. Optional export switches retain backend defaults
+when omitted, and `motions.list()` keeps its existing simple response.
+
+For a host that must avoid incidental requests, set `telemetry=False` when creating
+`Uthana`. The default remains enabled for existing callers. `trust_env=False`
+disables proxy/certificate environment handling; `transport` supports injectable
+async HTTP transports for testing. `max_response_bytes` bounds decoded GraphQL
+responses, while media and character-metadata methods accept their own `max_bytes`.
+New byte-snapshot uploads are bounded at 128 MiB by default. Existing file-upload
+entry points retain streaming without an input-size limit and the configured client
+timeout; pass `max_bytes` to opt into a bounded snapshot. Call `close()`
+when finished. No automatic mutation retries or redirect following are added.
+
+`UthanaError` retains its status and message and adds `kind` plus optional structured
+`response_data` for HTTP/GraphQL failures. Those fields may contain provider data;
+agent-facing integrations should redact them and distinguish uncertain submission
+from a confirmed rejection. Connection exceptions remain HTTPX exception types.
+
 ## API key
 
 You need an Uthana account and API key. [Sign up for free](https://uthana.com), then get your API key from [account settings](https://uthana.com/app/settings) once logged in. For full setup, verification, and capabilities, see the [Uthana API docs](https://uthana.com/docs/api/).

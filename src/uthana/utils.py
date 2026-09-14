@@ -64,3 +64,8 @@ def prepare_video_to_motion(file_path: str, motion_name: str | None) -> tuple[di
         motion_name = os.path.splitext(filename)[0]
     variables = {"motion_name": motion_name, "file": None}
     return variables, filename
+
+
+def _validate_upload_limit(max_bytes: int | None) -> None:
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 1):
+        raise ValueError("max_bytes must be a positive integer or None")
