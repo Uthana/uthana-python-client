@@ -188,6 +188,14 @@ query {
 }
 """
 
+    CREATE_ENHANCED_STITCHED_MOTION = """
+mutation CreateEnhancedStitchedMotion($stitch_input: MotionStitchInput!) {
+    create_enhanced_stitched_motion(stitch_input: $stitch_input) {
+        motion { id name }
+    }
+}
+"""
+
     CREATE_LOOPED_MOTION = """
 mutation CreateLoopedMotion(
     $character_id: String!, $motion_id: String!,

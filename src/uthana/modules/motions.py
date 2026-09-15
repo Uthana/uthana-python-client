@@ -12,6 +12,7 @@ from urllib.parse import quote
 import httpx
 
 from ..graphql import q
+from ..stitch import StitchParams, validate_stitch_params
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
@@ -91,6 +92,51 @@ class MotionsModule(_BaseModule):
     def trim_sync(self, motion_id: str, start: float, end: float, name: str) -> Motion:
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
+
+    async def create_stitched_motion(
+        self,
+        character_id: str,
+        prefix: StitchParams,
+        suffix: StitchParams,
+        *,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Join two sampled clips through the enhanced stitch preview API.
+
+        The caller supplies world-space root/pelvis samples on the same character
+        at zero, lower trim, and upper trim. Positions use meters in Y-up space,
+        rotations use x/y/z/w quaternions, and yaw uses radians. No placeholder
+        poses, sampling, spatial alignment, or retries are supplied by the client.
+        This synchronous API operation creates a new motion and may be charged.
+        """
+        if not isinstance(character_id, str) or not character_id.strip():
+            raise ValueError("character_id is required")
+        return await self._client._graphql(
+            q.CREATE_ENHANCED_STITCHED_MOTION,
+            {
+                "stitch_input": {
+                    "character_id": character_id,
+                    "prefix": validate_stitch_params(prefix),
+                    "suffix": validate_stitch_params(suffix),
+                }
+            },
+            path="create_enhanced_stitched_motion.motion",
+            return_type=Motion,
+            timeout=timeout,
+        )
+
+    def create_stitched_motion_sync(
+        self,
+        character_id: str,
+        prefix: StitchParams,
+        suffix: StitchParams,
+        *,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Join two sampled motion clips through the preview API (sync)."""
+        return asyncio.run(
+            self.create_stitched_motion(character_id, prefix, suffix, timeout=timeout)
+        )
 
     async def create_looped_motion(
         self,
