@@ -92,6 +92,101 @@ class MotionsModule(_BaseModule):
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
 
+    async def create_looped_motion(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        trim_start_pct: float = 0.0,
+        trim_end_pct: float = 1.0,
+        zone_duration: float = 2.0,
+        loop_mode: Literal["closed", "open"] = "closed",
+        zone_mode: Literal["modify", "extend"] = "modify",
+        zone_end_position: dict[str, float] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Create a new looped motion through the simplified preview API.
+
+        Trims are normalized fractions. Closed loops return to their start;
+        open loops continue traveling. Modify replaces an existing interval,
+        while extend adds a transition. The optional open-loop target uses the
+        API's planar x/y coordinates and facing_angle in radians. Without a
+        target, the API estimates continued travel. This synchronous operation
+        can be charged and is never retried by the client.
+        """
+
+        def finite(value):
+            return (
+                not isinstance(value, bool)
+                and isinstance(value, (int, float))
+                and math.isfinite(value)
+            )
+
+        if not all(isinstance(v, str) and v.strip() for v in (character_id, motion_id)):
+            raise ValueError("character_id and motion_id are required")
+        if not all(finite(v) for v in (trim_start_pct, trim_end_pct, zone_duration)):
+            raise ValueError("Trim fractions and zone_duration must be finite numbers")
+        if not 0 <= trim_start_pct < trim_end_pct <= 1 or zone_duration <= 0:
+            raise ValueError(
+                "Require 0 <= trim_start_pct < trim_end_pct <= 1 and zone_duration > 0"
+            )
+        if loop_mode not in {"closed", "open"} or zone_mode not in {"modify", "extend"}:
+            raise ValueError("Invalid loop_mode or zone_mode")
+        if zone_end_position is not None:
+            if (
+                loop_mode != "open"
+                or not isinstance(zone_end_position, dict)
+                or not {"x", "y"} <= zone_end_position.keys() <= {"x", "y", "facing_angle"}
+                or not all(finite(v) for v in zone_end_position.values())
+            ):
+                raise ValueError(
+                    "An open-loop target requires finite x/y and optional facing_angle"
+                )
+        return await self._client._graphql(
+            q.CREATE_LOOPED_MOTION,
+            {
+                "character_id": character_id,
+                "motion_id": motion_id,
+                "trim_start_pct": trim_start_pct,
+                "trim_end_pct": trim_end_pct,
+                "zone_duration": zone_duration,
+                "loop_mode": loop_mode,
+                "zone_mode": zone_mode,
+                "zone_end_position": zone_end_position,
+            },
+            path="create_looped_motion.motion",
+            return_type=Motion,
+            timeout=timeout,
+        )
+
+    def create_looped_motion_sync(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        trim_start_pct: float = 0.0,
+        trim_end_pct: float = 1.0,
+        zone_duration: float = 2.0,
+        loop_mode: Literal["closed", "open"] = "closed",
+        zone_mode: Literal["modify", "extend"] = "modify",
+        zone_end_position: dict[str, float] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Create a loop through the simplified preview API (sync)."""
+        return asyncio.run(
+            self.create_looped_motion(
+                character_id,
+                motion_id,
+                trim_start_pct=trim_start_pct,
+                trim_end_pct=trim_end_pct,
+                zone_duration=zone_duration,
+                loop_mode=loop_mode,
+                zone_mode=zone_mode,
+                zone_end_position=zone_end_position,
+                timeout=timeout,
+            )
+        )
+
     async def download_allowed(self, motion_id: str, character_id: str) -> dict:
         """Check download eligibility for a motion/character pair without downloading."""
         return await self._client._graphql(

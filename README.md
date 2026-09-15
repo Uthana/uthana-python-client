@@ -49,7 +49,8 @@ For a host that must avoid incidental requests, set `telemetry=False` when creat
 disables proxy/certificate environment handling; `transport` supports injectable
 async HTTP transports for testing. `max_response_bytes` bounds decoded GraphQL
 responses, while media and character-metadata methods accept their own `max_bytes`.
-New byte-snapshot uploads are bounded at 128 MiB by default. Existing file-upload
+Character/video byte-snapshot uploads are bounded at 128 MiB by default;
+reference-image preparation is bounded at 16 MiB. Existing file-upload
 entry points retain streaming without an input-size limit and the configured client
 timeout; pass `max_bytes` to opt into a bounded snapshot. Call `close()`
 when finished. No automatic mutation retries or redirect following are added.
@@ -211,6 +212,36 @@ async def locomotion_example():
 asyncio.run(locomotion_example())
 ```
 
+## Loop an existing motion
+
+[Docs: Stitch & loop motions](https://uthana.com/docs/api/capabilities/stitch-loop-motions)
+
+The simplified looping API is a **preview API** and may change. It returns a new
+`Motion` synchronously, preserving the source motion. Both async and `_sync`
+variants are available.
+
+```python
+looped = await uthana_client.motions.create_looped_motion(
+    character_id, motion_id,
+    trim_start_pct=0.0, trim_end_pct=1.0,
+    zone_duration=2.0, loop_mode="closed", zone_mode="modify",
+)
+print(looped.id)
+```
+
+Trim bounds are normalized fractions (`0 <= start < end <= 1`), and the transition
+is a positive number of seconds. `closed` returns to the start; `open` continues
+travel. `modify` changes existing frames, while `extend` adds transition frames.
+An open loop may specify `zone_end_position={"x": 1.0, "y": 2.0,
+"facing_angle": 0.5}`: planar x/y coordinates and an optional facing angle in
+radians. Omit the target to let the API infer travel. The SDK rejects nonfinite
+values, booleans, invalid modes, and targets on closed loops before submission.
+An optional `timeout` accepts seconds or `httpx.Timeout`.
+
+Looping uses the published stitching/looping price per generated output second;
+it is not a free trim. Inspect the resulting motion's duration and repeated
+playback before claiming a seamless loop.
+
 ## Video to motion (vtm)
 
 [Docs: Video to motion](https://uthana.com/docs/api/capabilities/video-to-motion)
@@ -307,6 +338,39 @@ async def manage_characters():
 
 asyncio.run(manage_characters())
 ```
+
+### Resumable image-to-character integration
+
+`characters.create_from_image(path)` retains its existing one-shot behavior.
+Integrations that must persist intermediate IDs can instead use two public steps:
+
+```python
+from pathlib import Path
+import httpx
+
+pending = await uthana_client.characters.prepare_from_image_bytes(
+    "reference.png", Path("reference.png").read_bytes(),
+    timeout=httpx.Timeout(360, connect=15),
+)
+# Persist pending.character_id and pending.previews[0]["key"] before proceeding.
+result = await uthana_client.characters.generate_from_image(
+    pending, pending.previews[0]["key"], name="My character", include_fingers=True,
+    timeout=httpx.Timeout(660, connect=15),
+)
+print(result.character["id"])
+```
+
+Preparation accepts a nonempty PNG/JPEG byte snapshot up to 16 MiB by default.
+The calling integration should validate image content and dimensions. Preparation
+returns an intermediate character ID and image key, not a finished rig. Both
+steps are synchronous API operations despite the async Python interface; set a
+host deadline long enough for both stages and transfer. The SDK does not save
+receipts or retry mutations. After an uncertain response, inspect the existing
+character before attempting another paid generation. A confirmed rejection of
+finalization can be retried explicitly using the persisted preparation result.
+`generate_from_image` retains existing defaults when the new optional `name`,
+`include_fingers`, and `timeout` keywords are omitted. Sync variants exist for both
+steps. Character generation retains its published price.
 
 ## Motions
 

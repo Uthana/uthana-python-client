@@ -188,6 +188,21 @@ query {
 }
 """
 
+    CREATE_LOOPED_MOTION = """
+mutation CreateLoopedMotion(
+    $character_id: String!, $motion_id: String!,
+    $trim_start_pct: Float, $trim_end_pct: Float, $zone_duration: Float,
+    $loop_mode: String!, $zone_mode: String, $zone_end_position: ZoneEndPositionInput
+) {
+    create_looped_motion(
+        character_id: $character_id, motion_id: $motion_id,
+        trim_start_pct: $trim_start_pct, trim_end_pct: $trim_end_pct,
+        zone_duration: $zone_duration, loop_mode: $loop_mode,
+        zone_mode: $zone_mode, zone_end_position: $zone_end_position
+    ) { motion { id name } }
+}
+"""
+
     CREATE_IMAGE_FROM_TEXT = """
 mutation CreateImageFromText($prompt: String!) {
     create_image_from_text(prompt: $prompt) {
