@@ -326,27 +326,114 @@ class CharactersModule(_BaseModule):
         """Upload a reference image and generate a character (sync)."""
         return asyncio.run(self.create_from_image(file, name=name, max_bytes=max_bytes))
 
+    async def prepare_from_image_bytes(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        max_bytes: int = 16 * 1024 * 1024,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> CharacterPreviewResult:
+        """Upload an image snapshot and prepare a reference for character generation.
+
+        This is the first stage of create_from_image. Persist the returned
+        character ID and image key before explicitly calling generate_from_image.
+        Preparing a reference is not proof that a rigged character exists.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits.
+        """
+        if type(max_bytes) is not int or max_bytes < 1:
+            raise ValueError("Image snapshots require a positive max_bytes limit")
+        if not isinstance(filename, str) or os.path.splitext(filename.lower())[1] not in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+        }:
+            raise ValueError("Choose a PNG or JPEG filename")
+        if not isinstance(content, bytes) or not content or len(content) > max_bytes:
+            raise ValueError("Image snapshot must be nonempty bytes and fit max_bytes")
+        data = await self._client._graphql(
+            q.CREATE_IMAGE_FROM_IMAGE,
+            {"file": None},
+            upload=(os.path.basename(filename), content),
+            path="create_image_from_image",
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
+        )
+        character_id = data.get("character_id") if isinstance(data, dict) else None
+        image = data.get("image") if isinstance(data, dict) else None
+        if (
+            not isinstance(character_id, str)
+            or not character_id
+            or not isinstance(image, dict)
+            or not isinstance(image.get("key"), str)
+            or not image["key"]
+        ):
+            raise UthanaError(502, "Invalid prepared image response", kind="invalid_response")
+        return CharacterPreviewResult(character_id=character_id, previews=[image], prompt="")
+
+    def prepare_from_image_bytes_sync(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        max_bytes: int = 16 * 1024 * 1024,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> CharacterPreviewResult:
+        """Prepare a selected image snapshot (sync)."""
+        return asyncio.run(
+            self.prepare_from_image_bytes(
+                filename,
+                content,
+                max_bytes=max_bytes,
+                timeout=timeout,
+            )
+        )
+
     async def generate_from_image(
         self,
         pending: CharacterPreviewResult,
         image_key: str,
+        *,
+        name: str | None = None,
+        include_fingers: bool | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> CreateFromGeneratedImageResult:
         """Finalize a character from a previously generated preview (step 2 of the two-step flow).
+
+        Omitted/None timeout uses 660-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits.
 
         Use when create_from_prompt was called without on_previews_ready and returned a
         CharacterPreviewResult. Pick a key from pending.previews and pass it here.
         """
         return await self._finalize_from_image(
-            pending.character_id, image_key, prompt=pending.prompt
+            pending.character_id,
+            image_key,
+            name=name,
+            prompt=pending.prompt,
+            include_fingers=include_fingers,
+            timeout=httpx.Timeout(660, connect=15) if timeout is None else timeout,
         )
 
     def generate_from_image_sync(
         self,
         pending: CharacterPreviewResult,
         image_key: str,
+        *,
+        name: str | None = None,
+        include_fingers: bool | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> CreateFromGeneratedImageResult:
         """Finalize a character from a previously generated preview (sync)."""
-        return asyncio.run(self.generate_from_image(pending, image_key))
+        return asyncio.run(
+            self.generate_from_image(
+                pending,
+                image_key,
+                name=name,
+                include_fingers=include_fingers,
+                timeout=timeout,
+            )
+        )
 
     async def list(self) -> list[Character]:
         """List all characters for the authenticated user."""
@@ -423,12 +510,24 @@ class CharactersModule(_BaseModule):
         image_key: str,
         name: str | None = None,
         prompt: str = "",
+        *,
+        include_fingers: bool | None = None,
+        timeout: float | httpx.Timeout | None = None,
     ) -> CreateFromGeneratedImageResult:
         """CREATE_CHARACTER_FROM_IMAGE — shared finalization step."""
+        variables: dict = {
+            "character_id": character_id,
+            "image_key": image_key,
+            "prompt": prompt,
+            "name": name,
+        }
+        if include_fingers is not None:
+            variables["include_fingers"] = include_fingers
         data = await self._client._graphql(
             q.CREATE_CHARACTER_FROM_IMAGE,
-            {"character_id": character_id, "image_key": image_key, "prompt": prompt, "name": name},
+            variables,
             path="create_character_from_image",
+            timeout=timeout,
         )
         data = data or {}
         return CreateFromGeneratedImageResult(

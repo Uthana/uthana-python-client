@@ -52,7 +52,8 @@ async HTTP transports for testing. `max_response_bytes` bounds decoded GraphQL
 hide a successful upload or generation receipt. To opt into a separate mutation
 limit, set `max_mutation_response_bytes`. Media and character-metadata methods
 accept their own `max_bytes`.
-New byte-snapshot uploads are bounded at 128 MiB by default. Existing file-upload
+Character/video byte-snapshot uploads are bounded at 128 MiB by default;
+reference-image preparation is bounded at 16 MiB. Existing file-upload
 entry points retain streaming without an input-size limit and the configured client
 timeout; pass `max_bytes` to opt into a bounded snapshot. Bounded character file
 uploads use the same 360-second phase timeout (15 seconds to connect) as byte
@@ -224,6 +225,82 @@ async def locomotion_example():
 asyncio.run(locomotion_example())
 ```
 
+## Loop an existing motion
+
+[Docs: Stitch & loop motions](https://uthana.com/docs/api/capabilities/stitch-loop-motions)
+
+The simplified looping API is a **preview API** and may change. It returns a new
+`Motion` synchronously, preserving the source motion. Both async and `_sync`
+variants are available.
+
+```python
+looped = await uthana_client.motions.create_looped_motion(
+    character_id, motion_id,
+    trim_start_pct=0.0, trim_end_pct=1.0,
+    zone_duration=2.0, loop_mode="closed", zone_mode="modify",
+)
+print(looped["id"])
+```
+
+Trim bounds are normalized fractions (`0 <= start < end <= 1`), and the transition
+is a positive number of seconds. `closed` returns to the start; `open` continues
+travel. `modify` changes existing frames, while `extend` adds transition frames.
+An open loop may specify `zone_end_position={"x": 1.0, "y": 2.0,
+"facing_angle": 0.5}`: planar x/y coordinates and an optional facing angle in
+radians. Omit the target to let the API infer travel. The SDK rejects nonfinite
+values, booleans, invalid modes, and targets on closed loops before submission.
+Omitting `timeout` (or passing `None`) uses 360-second HTTP phase limits with a
+15-second connect limit, independently of the general client timeout. An explicit
+`timeout` accepts seconds or `httpx.Timeout` and overrides those limits.
+
+Looping uses the published stitching/looping price per generated output second;
+it is not a free trim. Inspect the resulting motion's duration and repeated
+playback before claiming a seamless loop.
+
+## Stitch two existing motions
+
+`motions.create_stitched_motion(character_id, prefix, suffix)` uses the enhanced
+stitch preview API; its `_sync` variant has the same arguments. It returns a new
+`Motion` dictionary synchronously. This is separate from single-motion looping.
+
+Each clip is a `StitchParams` (import with `from uthana import StitchParams`)
+containing its motion ID, duration,
+trim times in seconds and matching fractions, root world position/rotation, and
+pelvis states at zero/lower/upper trim. See the
+[complete API input contract](https://uthana.com/docs/api/capabilities/stitch-loop-motions).
+Use `stitch_loop=False`, a positive `stitch_duration` (recommended 0.1–3 seconds),
+and `prompt=""` unless a transition prompt is intended. The prefix determines
+transition settings; keep both inputs consistent.
+
+```python
+import httpx
+
+# prefix_samples and suffix_samples are full StitchParams from your motion loader.
+stitched = await uthana_client.motions.create_stitched_motion(
+    character_id, prefix_samples, suffix_samples,
+    timeout=httpx.Timeout(360, connect=15),
+)
+print(stitched["id"])
+```
+
+Supply real poses sampled on the same target character in a shared world scene.
+Positions are meters in Y-up space (x/z horizontal), rotations are approximately
+unit x/y/z/w quaternions, and facing yaw is in radians. The client validates
+fields, finite values, quaternion length, and trim time/fraction consistency
+before submitting. It copies validated inputs and never supplies guessed poses,
+samples animations, aligns the scene, or automatically retries a mutation.
+
+Stitching defaults to 360-second HTTP phase limits and 15 seconds to connect when
+`timeout` is omitted or `None`; an explicit value overrides them. Allow the host
+enough time for the synchronous stitch or loop (at least 420 seconds with these
+phase limits, longer for transfers). Phase timeouts are not an overall deadline.
+If either response lacks a nonempty motion ID, the client raises
+`UthanaError(kind="uncertain")`: inspect existing work before resubmitting.
+Stitching keeps its published price per generated output second.
+Real playback and contact review are
+still required to establish transition quality. No pose-loader dependency is
+added to the Python client.
+
 ## Video to motion (vtm)
 
 [Docs: Video to motion](https://uthana.com/docs/api/capabilities/video-to-motion)
@@ -320,6 +397,46 @@ async def manage_characters():
 
 asyncio.run(manage_characters())
 ```
+
+### Resumable image-to-character integration
+
+`characters.create_from_image(path)` retains its existing one-shot behavior:
+unbounded streaming unless `max_bytes` is supplied, the configured client timeout,
+and no per-call `include_fingers` or `timeout` option. Use the two-step API below
+when you need its longer operation defaults or explicit controls.
+Integrations that must persist intermediate IDs can instead use two public steps:
+
+```python
+from pathlib import Path
+import httpx
+
+pending = await uthana_client.characters.prepare_from_image_bytes(
+    "reference.png", Path("reference.png").read_bytes(),
+    timeout=httpx.Timeout(360, connect=15),
+)
+# Persist pending.character_id and pending.previews[0]["key"] before proceeding.
+result = await uthana_client.characters.generate_from_image(
+    pending, pending.previews[0]["key"], name="My character", include_fingers=True,
+    timeout=httpx.Timeout(660, connect=15),
+)
+print(result.character["id"])
+```
+
+Preparation accepts a nonempty PNG/JPEG byte snapshot up to 16 MiB by default.
+The calling integration should validate image content and dimensions. Preparation
+returns an intermediate character ID and image key, not a finished rig. Both
+steps are synchronous API operations despite the async Python interface; set a
+host deadline long enough for both stages and transfer. The SDK does not save
+receipts or retry mutations. After an uncertain response, inspect the existing
+character before attempting another paid generation. A confirmed rejection of
+finalization can be retried explicitly using the persisted preparation result.
+Preparation defaults to 360-second HTTP phase limits; finalization through
+`generate_from_image` defaults to 660 seconds. Both allow 15 seconds to connect.
+Omitted/`None` timeouts use these operation defaults instead of the general client
+timeout; explicit seconds or `httpx.Timeout` overrides are honored. Host deadlines
+must cover both stages and transfer. Omitted `name` and `include_fingers` retain
+the backend defaults. Sync variants use the same limits. Character generation
+retains its published price.
 
 ## Motions
 

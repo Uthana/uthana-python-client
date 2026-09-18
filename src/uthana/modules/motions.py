@@ -12,6 +12,7 @@ from urllib.parse import quote
 import httpx
 
 from ..graphql import q
+from ..stitch import StitchParams, validate_stitch_params
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
@@ -93,6 +94,174 @@ class MotionsModule(_BaseModule):
     def trim_sync(self, motion_id: str, start: float, end: float, name: str) -> Motion:
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
+
+    async def create_stitched_motion(
+        self,
+        character_id: str,
+        prefix: StitchParams,
+        suffix: StitchParams,
+        *,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Join two sampled clips through the enhanced stitch preview API.
+
+        The caller supplies world-space root/pelvis samples on the same character
+        at zero, lower trim, and upper trim. Positions use meters in Y-up space,
+        rotations use x/y/z/w quaternions, and yaw uses radians. No placeholder
+        poses, sampling, spatial alignment, or retries are supplied by the client.
+        This synchronous API operation creates a new motion and may be charged.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits. A missing motion ID is uncertain.
+        """
+        if not isinstance(character_id, str) or not character_id.strip():
+            raise ValueError("character_id is required")
+        motion = await self._client._graphql(
+            q.CREATE_ENHANCED_STITCHED_MOTION,
+            {
+                "stitch_input": {
+                    "character_id": character_id,
+                    "prefix": validate_stitch_params(prefix),
+                    "suffix": validate_stitch_params(suffix),
+                }
+            },
+            path="create_enhanced_stitched_motion.motion",
+            return_type=Motion,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
+        )
+        if (
+            not isinstance(motion, dict)
+            or not isinstance(motion.get("id"), str)
+            or not motion["id"].strip()
+        ):
+            raise UthanaError(
+                502,
+                "The operation returned no motion ID and may have succeeded. "
+                "Inspect existing work before resubmitting.",
+                kind="uncertain",
+            )
+        return motion
+
+    def create_stitched_motion_sync(
+        self,
+        character_id: str,
+        prefix: StitchParams,
+        suffix: StitchParams,
+        *,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Join two sampled motion clips through the preview API (sync)."""
+        return asyncio.run(
+            self.create_stitched_motion(character_id, prefix, suffix, timeout=timeout)
+        )
+
+    async def create_looped_motion(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        trim_start_pct: float = 0.0,
+        trim_end_pct: float = 1.0,
+        zone_duration: float = 2.0,
+        loop_mode: Literal["closed", "open"] = "closed",
+        zone_mode: Literal["modify", "extend"] = "modify",
+        zone_end_position: dict[str, float] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Create a new looped motion through the simplified preview API.
+
+        Trims are normalized fractions. Closed loops return to their start;
+        open loops continue traveling. Modify replaces an existing interval,
+        while extend adds a transition. The optional open-loop target uses the
+        API's planar x/y coordinates and facing_angle in radians. Without a
+        target, the API estimates continued travel. This synchronous operation
+        can be charged and is never retried by the client.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits. A missing motion ID is uncertain.
+        """
+
+        def finite(value):
+            return (
+                not isinstance(value, bool)
+                and isinstance(value, (int, float))
+                and math.isfinite(value)
+            )
+
+        if not all(isinstance(v, str) and v.strip() for v in (character_id, motion_id)):
+            raise ValueError("character_id and motion_id are required")
+        if not all(finite(v) for v in (trim_start_pct, trim_end_pct, zone_duration)):
+            raise ValueError("Trim fractions and zone_duration must be finite numbers")
+        if not 0 <= trim_start_pct < trim_end_pct <= 1 or zone_duration <= 0:
+            raise ValueError(
+                "Require 0 <= trim_start_pct < trim_end_pct <= 1 and zone_duration > 0"
+            )
+        if loop_mode not in {"closed", "open"} or zone_mode not in {"modify", "extend"}:
+            raise ValueError("Invalid loop_mode or zone_mode")
+        if zone_end_position is not None:
+            if (
+                loop_mode != "open"
+                or not isinstance(zone_end_position, dict)
+                or not {"x", "y"} <= zone_end_position.keys() <= {"x", "y", "facing_angle"}
+                or not all(finite(v) for v in zone_end_position.values())
+            ):
+                raise ValueError(
+                    "An open-loop target requires finite x/y and optional facing_angle"
+                )
+        motion = await self._client._graphql(
+            q.CREATE_LOOPED_MOTION,
+            {
+                "character_id": character_id,
+                "motion_id": motion_id,
+                "trim_start_pct": trim_start_pct,
+                "trim_end_pct": trim_end_pct,
+                "zone_duration": zone_duration,
+                "loop_mode": loop_mode,
+                "zone_mode": zone_mode,
+                "zone_end_position": zone_end_position,
+            },
+            path="create_looped_motion.motion",
+            return_type=Motion,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
+        )
+        if (
+            not isinstance(motion, dict)
+            or not isinstance(motion.get("id"), str)
+            or not motion["id"].strip()
+        ):
+            raise UthanaError(
+                502,
+                "The operation returned no motion ID and may have succeeded. "
+                "Inspect existing work before resubmitting.",
+                kind="uncertain",
+            )
+        return motion
+
+    def create_looped_motion_sync(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        trim_start_pct: float = 0.0,
+        trim_end_pct: float = 1.0,
+        zone_duration: float = 2.0,
+        loop_mode: Literal["closed", "open"] = "closed",
+        zone_mode: Literal["modify", "extend"] = "modify",
+        zone_end_position: dict[str, float] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> Motion:
+        """Create a loop through the simplified preview API (sync)."""
+        return asyncio.run(
+            self.create_looped_motion(
+                character_id,
+                motion_id,
+                trim_start_pct=trim_start_pct,
+                trim_end_pct=trim_end_pct,
+                zone_duration=zone_duration,
+                loop_mode=loop_mode,
+                zone_mode=zone_mode,
+                zone_end_position=zone_end_position,
+                timeout=timeout,
+            )
+        )
 
     async def download_allowed(self, motion_id: str, character_id: str) -> dict:
         """Check download eligibility for a motion/character pair without downloading."""
