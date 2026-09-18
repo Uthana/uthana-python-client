@@ -339,9 +339,10 @@ class CharactersModule(_BaseModule):
         This is the first stage of create_from_image. Persist the returned
         character ID and image key before explicitly calling generate_from_image.
         Preparing a reference is not proof that a rigged character exists.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits.
         """
-        _validate_upload_limit(max_bytes)
-        if max_bytes is None:
+        if type(max_bytes) is not int or max_bytes < 1:
             raise ValueError("Image snapshots require a positive max_bytes limit")
         if not isinstance(filename, str) or os.path.splitext(filename.lower())[1] not in {
             ".png",
@@ -356,7 +357,7 @@ class CharactersModule(_BaseModule):
             {"file": None},
             upload=(os.path.basename(filename), content),
             path="create_image_from_image",
-            timeout=timeout,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
         )
         character_id = data.get("character_id") if isinstance(data, dict) else None
         image = data.get("image") if isinstance(data, dict) else None
@@ -399,6 +400,9 @@ class CharactersModule(_BaseModule):
     ) -> CreateFromGeneratedImageResult:
         """Finalize a character from a previously generated preview (step 2 of the two-step flow).
 
+        Omitted/None timeout uses 660-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits.
+
         Use when create_from_prompt was called without on_previews_ready and returned a
         CharacterPreviewResult. Pick a key from pending.previews and pass it here.
         """
@@ -408,7 +412,7 @@ class CharactersModule(_BaseModule):
             name=name,
             prompt=pending.prompt,
             include_fingers=include_fingers,
-            timeout=timeout,
+            timeout=httpx.Timeout(660, connect=15) if timeout is None else timeout,
         )
 
     def generate_from_image_sync(

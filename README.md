@@ -249,7 +249,9 @@ An open loop may specify `zone_end_position={"x": 1.0, "y": 2.0,
 "facing_angle": 0.5}`: planar x/y coordinates and an optional facing angle in
 radians. Omit the target to let the API infer travel. The SDK rejects nonfinite
 values, booleans, invalid modes, and targets on closed loops before submission.
-An optional `timeout` accepts seconds or `httpx.Timeout`.
+Omitting `timeout` (or passing `None`) uses 360-second HTTP phase limits with a
+15-second connect limit, independently of the general client timeout. An explicit
+`timeout` accepts seconds or `httpx.Timeout` and overrides those limits.
 
 Looping uses the published stitching/looping price per generated output second;
 it is not a free trim. Inspect the resulting motion's duration and repeated
@@ -261,7 +263,8 @@ playback before claiming a seamless loop.
 stitch preview API; its `_sync` variant has the same arguments. It returns a new
 `Motion` dictionary synchronously. This is separate from single-motion looping.
 
-Each clip is a `uthana.stitch.StitchParams` containing its motion ID, duration,
+Each clip is a `StitchParams` (import with `from uthana import StitchParams`)
+containing its motion ID, duration,
 trim times in seconds and matching fractions, root world position/rotation, and
 pelvis states at zero/lower/upper trim. See the
 [complete API input contract](https://uthana.com/docs/api/capabilities/stitch-loop-motions).
@@ -287,10 +290,14 @@ fields, finite values, quaternion length, and trim time/fraction consistency
 before submitting. It copies validated inputs and never supplies guessed poses,
 samples animations, aligns the scene, or automatically retries a mutation.
 
-Allow the host enough time for the synchronous stitch (at least 420 seconds with
-the illustrated phase limits, longer for transfers). Stitching keeps its published
-price per generated output second. A lost response does not prove rejection;
-inspect existing work before repeating it. Real playback and contact review are
+Stitching defaults to 360-second HTTP phase limits and 15 seconds to connect when
+`timeout` is omitted or `None`; an explicit value overrides them. Allow the host
+enough time for the synchronous stitch or loop (at least 420 seconds with these
+phase limits, longer for transfers). Phase timeouts are not an overall deadline.
+If either response lacks a nonempty motion ID, the client raises
+`UthanaError(kind="uncertain")`: inspect existing work before resubmitting.
+Stitching keeps its published price per generated output second.
+Real playback and contact review are
 still required to establish transition quality. No pose-loader dependency is
 added to the Python client.
 
@@ -393,7 +400,10 @@ asyncio.run(manage_characters())
 
 ### Resumable image-to-character integration
 
-`characters.create_from_image(path)` retains its existing one-shot behavior.
+`characters.create_from_image(path)` retains its existing one-shot behavior:
+unbounded streaming unless `max_bytes` is supplied, the configured client timeout,
+and no per-call `include_fingers` or `timeout` option. Use the two-step API below
+when you need its longer operation defaults or explicit controls.
 Integrations that must persist intermediate IDs can instead use two public steps:
 
 ```python
@@ -420,9 +430,13 @@ host deadline long enough for both stages and transfer. The SDK does not save
 receipts or retry mutations. After an uncertain response, inspect the existing
 character before attempting another paid generation. A confirmed rejection of
 finalization can be retried explicitly using the persisted preparation result.
-`generate_from_image` retains existing defaults when the new optional `name`,
-`include_fingers`, and `timeout` keywords are omitted. Sync variants exist for both
-steps. Character generation retains its published price.
+Preparation defaults to 360-second HTTP phase limits; finalization through
+`generate_from_image` defaults to 660 seconds. Both allow 15 seconds to connect.
+Omitted/`None` timeouts use these operation defaults instead of the general client
+timeout; explicit seconds or `httpx.Timeout` overrides are honored. Host deadlines
+must cover both stages and transfer. Omitted `name` and `include_fingers` retain
+the backend defaults. Sync variants use the same limits. Character generation
+retains its published price.
 
 ## Motions
 

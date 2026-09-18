@@ -110,10 +110,12 @@ class MotionsModule(_BaseModule):
         rotations use x/y/z/w quaternions, and yaw uses radians. No placeholder
         poses, sampling, spatial alignment, or retries are supplied by the client.
         This synchronous API operation creates a new motion and may be charged.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits. A missing motion ID is uncertain.
         """
         if not isinstance(character_id, str) or not character_id.strip():
             raise ValueError("character_id is required")
-        return await self._client._graphql(
+        motion = await self._client._graphql(
             q.CREATE_ENHANCED_STITCHED_MOTION,
             {
                 "stitch_input": {
@@ -124,8 +126,20 @@ class MotionsModule(_BaseModule):
             },
             path="create_enhanced_stitched_motion.motion",
             return_type=Motion,
-            timeout=timeout,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
         )
+        if (
+            not isinstance(motion, dict)
+            or not isinstance(motion.get("id"), str)
+            or not motion["id"].strip()
+        ):
+            raise UthanaError(
+                502,
+                "The operation returned no motion ID and may have succeeded. "
+                "Inspect existing work before resubmitting.",
+                kind="uncertain",
+            )
+        return motion
 
     def create_stitched_motion_sync(
         self,
@@ -161,6 +175,8 @@ class MotionsModule(_BaseModule):
         API's planar x/y coordinates and facing_angle in radians. Without a
         target, the API estimates continued travel. This synchronous operation
         can be charged and is never retried by the client.
+        Omitted/None timeout uses 360-second HTTP phase limits, 15 seconds to connect;
+        an explicit timeout overrides these limits. A missing motion ID is uncertain.
         """
 
         def finite(value):
@@ -190,7 +206,7 @@ class MotionsModule(_BaseModule):
                 raise ValueError(
                     "An open-loop target requires finite x/y and optional facing_angle"
                 )
-        return await self._client._graphql(
+        motion = await self._client._graphql(
             q.CREATE_LOOPED_MOTION,
             {
                 "character_id": character_id,
@@ -204,8 +220,20 @@ class MotionsModule(_BaseModule):
             },
             path="create_looped_motion.motion",
             return_type=Motion,
-            timeout=timeout,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
         )
+        if (
+            not isinstance(motion, dict)
+            or not isinstance(motion.get("id"), str)
+            or not motion["id"].strip()
+        ):
+            raise UthanaError(
+                502,
+                "The operation returned no motion ID and may have succeeded. "
+                "Inspect existing work before resubmitting.",
+                kind="uncertain",
+            )
+        return motion
 
     def create_looped_motion_sync(
         self,
