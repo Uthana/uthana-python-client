@@ -8,7 +8,8 @@ import asyncio
 import inspect
 import json
 import os
-from typing import Callable, List, Optional, overload
+from typing import BinaryIO, Callable, List, Optional, overload
+from urllib.parse import quote
 
 import httpx
 
@@ -22,7 +23,7 @@ from ..types import (
     OutputFormat,
     UthanaError,
 )
-from ..utils import prepare_create_character
+from ..utils import _validate_upload_limit, prepare_create_character
 from ._base import _BaseModule
 
 
@@ -37,26 +38,46 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
         rerig_target: str | None = None,
         include_fingers: bool | None = None,
+        name: str | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        max_bytes: int | None = None,
     ) -> CreateCharacterResult:
-        """Upload a GLB or FBX and optionally auto-rig. Returns CreateCharacterResult."""
+        """Upload a GLB or FBX and optionally auto-rig.
+
+        Streams the source without an input-size limit by default and preserves
+        the client's configured timeout. An explicit ``max_bytes`` instead reads a
+        bounded snapshot with the byte upload's 360-second phase timeout (15 seconds
+        to connect). Set ``timeout`` to override either path's timeout.
+        """
         if not file:
             raise UthanaError(400, "file is required (.glb or .fbx)")
-        variables, name, ext, _ = prepare_create_character(
+        _validate_upload_limit(max_bytes)
+        variables, source_name, ext, _ = prepare_create_character(
             file, auto_rig, front_facing, rerig_target, include_fingers
         )
-        operations = json.dumps({"query": q.CREATE_CHARACTER, "variables": variables})
-        map_data = json.dumps({"0": ["variables.file"]})
-        with open(file, "rb") as f:
-            async with httpx.AsyncClient(
-                auth=(self._client._api_key, ""), timeout=self._client._timeout
-            ) as http:
-                response = await http.post(
-                    self._client.graphql_url,
-                    data={"operations": operations, "map": map_data},
-                    files={"0": (f"{name}.{ext}", f, "application/octet-stream")},
+        if name is not None:
+            variables["name"] = name
+        with open(file, "rb") as source:
+            if max_bytes is None:
+                data = await self._client._graphql(
+                    q.CREATE_CHARACTER,
+                    variables,
+                    upload=(f"{source_name}.{ext}", source),
+                    timeout=timeout,
                 )
-        result = self._client._check_response(response)
-        return self._client._build_character_output(result=result, ext=ext)
+                return self._client._build_character_output(result={"data": data}, ext=ext)
+            content = source.read(max_bytes + 1)
+        return await self.create_from_bytes(
+            f"{source_name}.{ext}",
+            content,
+            name=source_name if name is None else name,
+            auto_rig=auto_rig,
+            front_facing=front_facing,
+            rerig_target=rerig_target,
+            include_fingers=include_fingers,
+            timeout=timeout,
+            max_bytes=max_bytes,
+        )
 
     def create_from_file_sync(
         self,
@@ -66,6 +87,9 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
         rerig_target: str | None = None,
         include_fingers: bool | None = None,
+        name: str | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        max_bytes: int | None = None,
     ) -> CreateCharacterResult:
         """Upload a GLB or FBX and optionally auto-rig (sync)."""
         return asyncio.run(
@@ -75,8 +99,102 @@ class CharactersModule(_BaseModule):
                 front_facing=front_facing,
                 rerig_target=rerig_target,
                 include_fingers=include_fingers,
+                name=name,
+                timeout=timeout,
+                max_bytes=max_bytes,
             )
         )
+
+    async def create_from_bytes(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        name: str | None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+        rerig_target: str | None = None,
+        include_fingers: bool | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        max_bytes: int | None = 128 * 1024 * 1024,
+    ) -> CreateCharacterResult:
+        """Upload an existing byte snapshot without reopening its source file.
+
+        ``filename`` supplies the format and default name; an explicit ``name`` is
+        preserved exactly. Returns backend compatibility warnings in ``message``.
+        The default timeout includes the backend's synchronous character processing.
+        """
+        _validate_upload_limit(max_bytes)
+        if not isinstance(content, bytes) or not content:
+            raise ValueError("Character upload content must be nonempty bytes")
+        if max_bytes is not None and len(content) > max_bytes:
+            raise ValueError("Character upload exceeds max_bytes")
+        filename = os.path.basename(filename)
+        stem, extension = os.path.splitext(filename)
+        ext = extension.lstrip(".").lower()
+        if ext not in ("glb", "fbx"):
+            raise ValueError("Character filename must use .glb or .fbx")
+        variables = {
+            "file": None,
+            "name": stem if name is None else name,
+            "auto_rig": auto_rig,
+            "auto_rig_front_facing": front_facing,
+            "rerig_target": rerig_target,
+            "include_fingers": include_fingers,
+        }
+        data = await self._client._graphql(
+            q.CREATE_CHARACTER,
+            variables,
+            upload=(filename, content),
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
+        )
+        return self._client._build_character_output(result={"data": data}, ext=ext)
+
+    def create_from_bytes_sync(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        name: str | None = None,
+        auto_rig: bool | None = None,
+        front_facing: bool | None = None,
+        rerig_target: str | None = None,
+        include_fingers: bool | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        max_bytes: int | None = 128 * 1024 * 1024,
+    ) -> CreateCharacterResult:
+        """Upload a character byte snapshot (sync)."""
+        return asyncio.run(
+            self.create_from_bytes(
+                filename,
+                content,
+                name=name,
+                auto_rig=auto_rig,
+                front_facing=front_facing,
+                rerig_target=rerig_target,
+                include_fingers=include_fingers,
+                timeout=timeout,
+                max_bytes=max_bytes,
+            )
+        )
+
+    async def metadata(self, character_id: str, *, max_bytes: int | None = None) -> dict:
+        """Get character rig metadata used to validate character-specific edits."""
+        url = f"{self._client.base_url}/motion/metadata/{quote(character_id, safe='')}"
+        data = await self._client._request_bytes("GET", url, max_bytes=max_bytes)
+        try:
+            result = json.loads(data)
+        except (ValueError, UnicodeDecodeError):
+            raise UthanaError(
+                502, "Invalid character metadata response", kind="invalid_response"
+            ) from None
+        if not isinstance(result, dict):
+            raise UthanaError(502, "Invalid character metadata response", kind="invalid_response")
+        return result
+
+    def metadata_sync(self, character_id: str, *, max_bytes: int | None = None) -> dict:
+        """Get character rig metadata (sync)."""
+        return asyncio.run(self.metadata(character_id, max_bytes=max_bytes))
 
     @overload
     async def create_from_prompt(
@@ -166,27 +284,36 @@ class CharactersModule(_BaseModule):
         file: str,
         *,
         name: str | None = None,
+        max_bytes: int | None = None,
     ) -> CreateFromGeneratedImageResult:
-        """Upload a reference image (PNG/JPEG) and generate a character. One-shot step."""
+        """Upload a reference image (PNG/JPEG) and generate a character in one step.
+
+        Streams the source without an input-size limit by default. An explicit
+        ``max_bytes`` reads a bounded snapshot instead.
+        """
         if not file:
             raise UthanaError(400, "file is required (.png, .jpg, .jpeg)")
-        name_part = os.path.splitext(os.path.basename(file))[0]
-        ext = os.path.splitext(file)[1].lstrip(".")
-        operations = json.dumps({"query": q.CREATE_IMAGE_FROM_IMAGE, "variables": {"file": None}})
-        map_data = json.dumps({"0": ["variables.file"]})
-        with open(file, "rb") as f:
-            async with httpx.AsyncClient(
-                auth=(self._client._api_key, ""), timeout=self._client._timeout
-            ) as http:
-                response = await http.post(
-                    self._client.graphql_url,
-                    data={"operations": operations, "map": map_data},
-                    files={"0": (f"{name_part}.{ext}", f, "application/octet-stream")},
-                )
-        result = self._client._check_response(response)
-        gql_data = (result.get("data") or {}).get("create_image_from_image") or {}
-        character_id = gql_data.get("character_id", "")
-        image = gql_data.get("image") or {}
+        _validate_upload_limit(max_bytes)
+        with open(file, "rb") as source:
+            upload_content: bytes | BinaryIO = source
+            if max_bytes is not None:
+                content = source.read(max_bytes + 1)
+                if not content or len(content) > max_bytes:
+                    raise ValueError("Image upload must be nonempty and fit max_bytes")
+                upload_content = content
+            data = await self._client._graphql(
+                q.CREATE_IMAGE_FROM_IMAGE,
+                {"file": None},
+                upload=(os.path.basename(file), upload_content),
+                path="create_image_from_image",
+            )
+        data = data or {}
+        character_id = data.get("character_id", "")
+        image = data.get("image") or {}
+        if not character_id or not image.get("key"):
+            raise UthanaError(
+                502, "Image upload returned no character or image key", kind="invalid_response"
+            )
         return await self._finalize_from_image(character_id, image.get("key", ""), name)
 
     def create_from_image_sync(
@@ -194,9 +321,10 @@ class CharactersModule(_BaseModule):
         file: str,
         *,
         name: str | None = None,
+        max_bytes: int | None = None,
     ) -> CreateFromGeneratedImageResult:
         """Upload a reference image and generate a character (sync)."""
-        return asyncio.run(self.create_from_image(file, name=name))
+        return asyncio.run(self.create_from_image(file, name=name, max_bytes=max_bytes))
 
     async def generate_from_image(
         self,
@@ -238,26 +366,26 @@ class CharactersModule(_BaseModule):
         character_id: str,
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+        max_bytes: int | None = None,
     ) -> bytes:
-        """Download a character model in the requested format."""
+        """Download a character model in the requested format, optionally size bounded."""
         ext = output_format.lower()
-        url = f"{self._client.base_url}/motion/bundle/{character_id}/character.{ext}"
-        async with httpx.AsyncClient(
-            auth=(self._client._api_key, ""), timeout=self._client._timeout
-        ) as http:
-            response = await http.get(url)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return response.content
+        url = (
+            f"{self._client.base_url}/motion/bundle/{quote(character_id, safe='')}/character.{ext}"
+        )
+        return await self._client._request_bytes("GET", url, max_bytes=max_bytes)
 
     def download_sync(
         self,
         character_id: str,
         *,
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
+        max_bytes: int | None = None,
     ) -> bytes:
         """Download a character model in the requested format (sync)."""
-        return asyncio.run(self.download(character_id, output_format=output_format))
+        return asyncio.run(
+            self.download(character_id, output_format=output_format, max_bytes=max_bytes)
+        )
 
     async def rename(self, character_id: str, name: str) -> Character:
         """Rename a character by ID."""

@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List, cast
+import math
+from typing import List, Literal
+from urllib.parse import quote
 
 import httpx
 
@@ -37,6 +39,73 @@ class MotionsModule(_BaseModule):
         """List all motions for the authenticated user (sync)."""
         return asyncio.run(self.list())
 
+    async def get(self, motion_id: str) -> Motion:
+        """Get a motion and its asset metadata, including native bundle information."""
+        motion = await self._client._graphql(
+            q.GET_MOTION,
+            {"motion_id": motion_id},
+            path="motion",
+            return_type=Motion,
+        )
+        if not motion:
+            raise UthanaError(404, "Motion not found", kind="http")
+        return motion
+
+    def get_sync(self, motion_id: str) -> Motion:
+        """Get a motion and its asset metadata (sync)."""
+        return asyncio.run(self.get(motion_id))
+
+    async def catalog(self) -> dict:
+        """List motion-viewer motions with tags and their owning organization IDs.
+
+        Includes the authenticated organization ID to distinguish its motions from
+        library motions. The simpler :meth:`list` interface remains unchanged.
+        """
+        return await self._client._graphql(q.MOTION_CATALOG)
+
+    def catalog_sync(self) -> dict:
+        """Get the motion-viewer catalog and authenticated organization ID (sync)."""
+        return asyncio.run(self.catalog())
+
+    async def trim(self, motion_id: str, start: float, end: float, name: str) -> Motion:
+        """Create a trimmed motion from normalized start/end fractions without looping.
+
+        Fractions address the source duration, with ``0 <= start < end <= 1``.
+        Convert time values to fractions using the source motion's native duration.
+        """
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, (int, float))
+            or not isinstance(end, (int, float))
+            or not math.isfinite(start)
+            or not math.isfinite(end)
+            or not 0 <= start < end <= 1
+        ):
+            raise ValueError("Trim fractions must be finite and satisfy 0 <= start < end <= 1")
+        return await self._client._graphql(
+            q.TRIM_MOTION,
+            {"motion_id": motion_id, "start": start, "end": end, "name": name},
+            path="trim_and_loop_motion.motion",
+            return_type=Motion,
+        )
+
+    def trim_sync(self, motion_id: str, start: float, end: float, name: str) -> Motion:
+        """Create a trimmed motion without enabling looping (sync)."""
+        return asyncio.run(self.trim(motion_id, start, end, name))
+
+    async def download_allowed(self, motion_id: str, character_id: str) -> dict:
+        """Check download eligibility for a motion/character pair without downloading."""
+        return await self._client._graphql(
+            q.DOWNLOAD_ALLOWED,
+            {"motion_id": motion_id, "character_id": character_id},
+            path="motion_download_allowed",
+        )
+
+    def download_allowed_sync(self, motion_id: str, character_id: str) -> dict:
+        """Check download eligibility for a motion/character pair (sync)."""
+        return asyncio.run(self.download_allowed(motion_id, character_id))
+
     async def download(
         self,
         character_id: str,
@@ -45,22 +114,30 @@ class MotionsModule(_BaseModule):
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
         fps: int | None = None,
         no_mesh: bool | None = None,
+        in_place: bool | None = None,
+        roblox_compatible: bool | None = None,
+        speed_multiplier: float | None = None,
+        torso_only: bool | None = None,
+        max_bytes: int | None = None,
     ) -> bytes:
-        """Download a motion animation file, retargeted to the given character."""
+        """Download a GLB, FBX, or BVH animation retargeted to the given character.
+
+        Optional export parameters retain backend defaults when omitted. ``no_mesh``
+        controls mesh inclusion; skeleton and animation remain in supported formats.
+        ``max_bytes`` bounds the downloaded response when supplied.
+        """
         url = self._client._motion_url(
             character_id=character_id,
             motion_id=motion_id,
             output_format=output_format,
             fps=fps,
             no_mesh=no_mesh,
+            in_place=in_place,
+            roblox_compatible=roblox_compatible,
+            speed_multiplier=speed_multiplier,
+            torso_only=torso_only,
         )
-        async with httpx.AsyncClient(
-            auth=(self._client._api_key, ""), timeout=self._client._timeout
-        ) as http:
-            response = await http.get(url)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return cast(bytes, response.content)
+        return await self._client._request_bytes("GET", url, max_bytes=max_bytes)
 
     def download_sync(
         self,
@@ -70,28 +147,65 @@ class MotionsModule(_BaseModule):
         output_format: OutputFormat = DEFAULT_OUTPUT_FORMAT,
         fps: int | None = None,
         no_mesh: bool | None = None,
+        in_place: bool | None = None,
+        roblox_compatible: bool | None = None,
+        speed_multiplier: float | None = None,
+        torso_only: bool | None = None,
+        max_bytes: int | None = None,
     ) -> bytes:
-        """Download a motion animation file, retargeted to the given character (sync)."""
+        """Download a motion animation retargeted to the given character (sync)."""
         return asyncio.run(
             self.download(
-                character_id, motion_id, output_format=output_format, fps=fps, no_mesh=no_mesh
+                character_id,
+                motion_id,
+                output_format=output_format,
+                fps=fps,
+                no_mesh=no_mesh,
+                in_place=in_place,
+                roblox_compatible=roblox_compatible,
+                speed_multiplier=speed_multiplier,
+                torso_only=torso_only,
+                max_bytes=max_bytes,
             )
         )
 
-    async def preview(self, character_id: str, motion_id: str) -> bytes:
-        """Download motion preview WebM (does not charge download seconds)."""
-        url = f"{self._client.base_url}/app/preview/{character_id}/{motion_id}/preview.webm"
-        async with httpx.AsyncClient(
-            auth=(self._client._api_key, ""), timeout=self._client._timeout
-        ) as http:
-            response = await http.get(url, timeout=60.0)
-        if not response.is_success:
-            raise UthanaError(response.status_code, response.text)
-        return cast(bytes, response.content)
+    async def preview(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        format: Literal["webm", "apng"] = "webm",
+        max_bytes: int | None = None,
+        timeout: float | httpx.Timeout = 60.0,
+    ) -> bytes:
+        """Download a WebM or APNG preview without charging download seconds.
 
-    def preview_sync(self, character_id: str, motion_id: str) -> bytes:
-        """Download motion preview WebM (does not charge download seconds) (sync)."""
-        return asyncio.run(self.preview(character_id, motion_id))
+        WebM and a 60-second request timeout remain the defaults. APNG uses the
+        existing ``preview.png`` endpoint. Export effects do not apply to previews.
+        """
+        if format not in ("webm", "apng"):
+            raise ValueError("Preview format must be webm or apng")
+        suffix = "png" if format == "apng" else "webm"
+        character = quote(character_id, safe="")
+        motion = quote(motion_id, safe="")
+        url = f"{self._client.base_url}/app/preview/{character}/{motion}/preview.{suffix}"
+        return await self._client._request_bytes("GET", url, max_bytes=max_bytes, timeout=timeout)
+
+    def preview_sync(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        format: Literal["webm", "apng"] = "webm",
+        max_bytes: int | None = None,
+        timeout: float | httpx.Timeout = 60.0,
+    ) -> bytes:
+        """Download a WebM or APNG motion preview (sync)."""
+        return asyncio.run(
+            self.preview(
+                character_id, motion_id, format=format, max_bytes=max_bytes, timeout=timeout
+            )
+        )
 
     async def delete(self, motion_id: str) -> Motion:
         """Soft-delete a motion by ID."""
@@ -136,11 +250,13 @@ class MotionsModule(_BaseModule):
         motion_name: str,
         *,
         character_id: str | None = None,
+        source_motion_id: str | None = None,
     ) -> TextToMotionResult:
         """Bake GLTF content as a new motion for an existing character.
 
         Use this to submit custom or edited GLTF animation data to the platform.
-        Returns the resulting motion_id and character_id.
+        Returns the resulting motion_id and character_id. ``source_motion_id``
+        optionally associates the baked motion with its source animation.
         """
         char_id = character_id or UthanaCharacters.tar
         variables = {
@@ -148,6 +264,8 @@ class MotionsModule(_BaseModule):
             "motionName": motion_name,
             "characterId": char_id,
         }
+        if source_motion_id is not None:
+            variables["sourceMotionId"] = source_motion_id
         data = await self._client._graphql(
             q.CREATE_MOTION_FROM_GLTF, variables, path="create_motion_from_gltf"
         )
@@ -164,10 +282,16 @@ class MotionsModule(_BaseModule):
         motion_name: str,
         *,
         character_id: str | None = None,
+        source_motion_id: str | None = None,
     ) -> TextToMotionResult:
         """Bake GLTF content as a new motion for an existing character (sync)."""
         return asyncio.run(
-            self.bake_with_changes(gltf_content, motion_name, character_id=character_id)
+            self.bake_with_changes(
+                gltf_content,
+                motion_name,
+                character_id=character_id,
+                source_motion_id=source_motion_id,
+            )
         )
 
     async def create_locomotion(

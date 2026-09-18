@@ -190,17 +190,19 @@ async def test_create_image_uploads_and_finalizes(tmp_path) -> None:
     img_file = tmp_path / "ref.png"
     img_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
-    mock_http = _make_httpx_mock(
-        {"create_image_from_image": {"character_id": "c2", "image": {"key": "k2", "url": "u2"}}}
-    )
-
     client = _make_client()
     client._graphql = AsyncMock(
-        return_value={"character": {"id": "c2", "name": "Archer"}, "auto_rig_confidence": 0.7}
+        side_effect=[
+            {"character_id": "c2", "image": {"key": "k2", "url": "u2"}},
+            {"character": {"id": "c2", "name": "Archer"}, "auto_rig_confidence": 0.7},
+        ]
     )
 
-    with patch("uthana.modules.characters.httpx.AsyncClient", return_value=mock_http):
-        result = await client.characters.create_from_image(str(img_file))
+    result = await client.characters.create_from_image(str(img_file))
+    filename, uploaded_file = client._graphql.call_args_list[0].kwargs["upload"]
+    assert filename == "ref.png"
+    assert uploaded_file.name == str(img_file)
+    assert uploaded_file.closed
 
     assert isinstance(result, CreateFromGeneratedImageResult)
     assert result.character["id"] == "c2"
@@ -266,23 +268,17 @@ async def test_delete_calls_mutation() -> None:
 async def test_preview_calls_correct_url() -> None:
     client = _make_client()
 
-    mock_response = MagicMock()
-    mock_response.is_success = True
-    mock_response.content = b"webm-bytes"
+    client._request_bytes = AsyncMock(return_value=b"webm-bytes")
 
-    mock_http = AsyncMock()
-    mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-    mock_http.__aexit__ = AsyncMock(return_value=False)
-    mock_http.get = AsyncMock(return_value=mock_response)
-
-    with patch("uthana.modules.motions.httpx.AsyncClient", return_value=mock_http):
-        result = await client.motions.preview("char1", "motion1")
+    result = await client.motions.preview("char1", "motion1")
 
     assert result == b"webm-bytes"
-    call_url = mock_http.get.call_args[0][0]
-    assert "char1" in call_url
-    assert "motion1" in call_url
-    assert "preview.webm" in call_url
+    client._request_bytes.assert_awaited_once_with(
+        "GET",
+        "https://uthana.com/app/preview/char1/motion1/preview.webm",
+        max_bytes=None,
+        timeout=60.0,
+    )
 
 
 # ---------------------------------------------------------------------------

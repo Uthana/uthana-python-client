@@ -31,3 +31,21 @@ class OrgModule(_BaseModule):
     def get_org_sync(self) -> Org:
         """Get current organization information including quota (sync)."""
         return asyncio.run(self.get_org())
+
+    async def get_usage(self) -> dict:
+        """Get account quotas, subscription state, PAYG balance, and current prices."""
+        return await self._client._graphql(q.GET_USAGE)
+
+    def get_usage_sync(self) -> dict:
+        """Get account usage, subscription state, and current prices (sync)."""
+        return asyncio.run(self.get_usage())
+
+    async def get_prices(self) -> list[dict]:
+        """Get current PAYG model prices with their billing units."""
+        return await self._client._graphql(
+            q.GET_PRICES, path="payg_prices", path_default=[], return_type=list[dict]
+        )
+
+    def get_prices_sync(self) -> list[dict]:
+        """Get current PAYG model prices with their billing units (sync)."""
+        return asyncio.run(self.get_prices())

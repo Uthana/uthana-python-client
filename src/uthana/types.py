@@ -19,9 +19,19 @@ class Error(Exception):
 class UthanaError(Error):
     """Raised when the API returns an error response."""
 
-    def __init__(self, status_code: int, message: str):
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        *,
+        kind: Literal["http", "graphql", "invalid_response", "response_too_large", "uncertain"]
+        | None = None,
+        response_data: dict | None = None,
+    ):
         self.status_code = status_code
         self.message = message
+        self.kind = kind
+        self.response_data = response_data
         super().__init__(f"Uthana API error {status_code}: {message}")
 
 
@@ -64,6 +74,9 @@ class Motion(TypedDict, total=False):
     name: str | None
     created: str | None
     deleted: str | None
+    assets: list[dict]
+    org_id: str
+    tags: dict[str, object]
 
 
 class Job(TypedDict, total=False):
@@ -102,6 +115,7 @@ class CreateCharacterResult:
     url: str
     character_id: str
     auto_rig_confidence: float | None = None
+    message: str | None = None
 
 
 @dataclass
@@ -143,7 +157,7 @@ TtmModelType = Literal[
 TtmJobModelType = Literal["text-to-motion-3.0"]
 VtmModelType = Literal["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2"]
 ModelType = Literal["auto"] | TtmModelType | TtmJobModelType | VtmModelType
-OutputFormat = Literal["glb", "fbx"]
+OutputFormat = Literal["glb", "fbx", "bvh"]
 
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
 DEFAULT_TIMEOUT = 120.0
