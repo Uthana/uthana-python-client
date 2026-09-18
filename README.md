@@ -48,17 +48,30 @@ For a host that must avoid incidental requests, set `telemetry=False` when creat
 `Uthana`. The default remains enabled for existing callers. `trust_env=False`
 disables proxy/certificate environment handling; `transport` supports injectable
 async HTTP transports for testing. `max_response_bytes` bounds decoded GraphQL
-responses, while media and character-metadata methods accept their own `max_bytes`.
+**query** responses. Mutations are unlimited by default so a read limit cannot
+hide a successful upload or generation receipt. To opt into a separate mutation
+limit, set `max_mutation_response_bytes`. Media and character-metadata methods
+accept their own `max_bytes`.
 Character/video byte-snapshot uploads are bounded at 128 MiB by default;
 reference-image preparation is bounded at 16 MiB. Existing file-upload
 entry points retain streaming without an input-size limit and the configured client
-timeout; pass `max_bytes` to opt into a bounded snapshot. Call `close()`
+timeout; pass `max_bytes` to opt into a bounded snapshot. Bounded character file
+uploads use the same 360-second phase timeout (15 seconds to connect) as byte
+uploads unless `timeout` is explicitly supplied. Call `close()`
 when finished. No automatic mutation retries or redirect following are added.
 
 `UthanaError` retains its status and message and adds `kind` plus optional structured
 `response_data` for HTTP/GraphQL failures. Those fields may contain provider data;
 agent-facing integrations should redact them and distinguish uncertain submission
-from a confirmed rejection. Connection exceptions remain HTTPX exception types.
+from a confirmed rejection. If a successful HTTP mutation response exceeds its
+explicit byte limit, `kind="uncertain"` means the write may have completed, but its
+receipt could not be read. Do not automatically resubmit: inspect the job or asset
+using any known ID, reconcile with the host's saved request record, or ask support
+if no receipt is available. A query/media overflow remains `kind="response_too_large"`.
+Connection exceptions remain HTTPX exception types.
+
+Video-to-motion uploads accept MP4, MOV, and AVI. WebM input is not supported by
+the backend; WebM **preview downloads** remain available.
 
 ## API key
 
