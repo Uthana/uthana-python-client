@@ -24,7 +24,8 @@ class UthanaError(Error):
         status_code: int,
         message: str,
         *,
-        kind: Literal["http", "graphql", "invalid_response", "response_too_large"] | None = None,
+        kind: Literal["http", "graphql", "invalid_response", "response_too_large", "uncertain"]
+        | None = None,
         response_data: dict | None = None,
     ):
         self.status_code = status_code
@@ -75,7 +76,7 @@ class Motion(TypedDict, total=False):
     deleted: str | None
     assets: list[dict]
     org_id: str
-    tags: list[str]
+    tags: dict[str, object]
 
 
 class Job(TypedDict, total=False):
@@ -160,7 +161,7 @@ OutputFormat = Literal["glb", "fbx", "bvh"]
 
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
 DEFAULT_TIMEOUT = 120.0
-SUPPORTED_VIDEO_FORMATS = frozenset({".mp4", ".mov", ".avi", ".webm"})
+SUPPORTED_VIDEO_FORMATS = frozenset({".mp4", ".mov", ".avi"})
 
 
 @dataclass(frozen=True)

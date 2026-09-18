@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from importlib.metadata import version as _pkg_version
 from typing import BinaryIO, TypeVar, cast, overload
@@ -51,6 +52,7 @@ class Uthana:
         transport: httpx.AsyncBaseTransport | None = None,
         trust_env: bool = True,
         max_response_bytes: int | None = None,
+        max_mutation_response_bytes: int | None = None,
     ) -> None:
         """Create an Uthana client.
 
@@ -61,7 +63,10 @@ class Uthana:
             telemetry: Log initialization when true; false avoids constructor network calls.
             transport: Optional transport for async API requests, including offline tests.
             trust_env: Honor HTTP proxy and certificate environment variables when true.
-            max_response_bytes: Maximum decoded GraphQL response size; None leaves it unlimited.
+            max_response_bytes: Maximum decoded GraphQL query response size; None is unlimited.
+            max_mutation_response_bytes: Optional separate mutation response limit. Exceeding
+                it raises kind="uncertain": the operation may have succeeded; do not resubmit
+                without reconciling the result. Mutations are unlimited by default.
         """
         domain = domain or "uthana.com"
         self.base_url = f"https://{domain}"
@@ -71,7 +76,9 @@ class Uthana:
         self._transport = transport
         self._trust_env = trust_env
         self._validate_response_limit(max_response_bytes)
+        self._validate_response_limit(max_mutation_response_bytes)
         self._max_response_bytes = max_response_bytes
+        self._max_mutation_response_bytes = max_mutation_response_bytes
         self.session = httpx.Client(
             auth=(api_key, ""), timeout=timeout, trust_env=trust_env, follow_redirects=False
         )
@@ -134,6 +141,7 @@ class Uthana:
         url: str,
         *,
         max_bytes: int | None = None,
+        mutating: bool = False,
         **kwargs,
     ) -> bytes:
         """Read a response with optional decoded-byte bounds and no automatic retries.
@@ -164,8 +172,14 @@ class Uthana:
                         if max_bytes is not None and len(part) > max_bytes - len(body):
                             raise UthanaError(
                                 response.status_code,
-                                "Response exceeded the configured byte limit",
-                                kind="response_too_large",
+                                (
+                                    "Mutation response exceeded the configured byte limit; "
+                                    "the operation may have succeeded. Inspect the result "
+                                    "before resubmitting."
+                                    if mutating
+                                    else "Response exceeded the configured byte limit"
+                                ),
+                                kind="uncertain" if mutating else "response_too_large",
                             )
                         body.extend(part)
                 data = bytes(body)
@@ -215,7 +229,16 @@ class Uthana:
         upload: tuple[str, bytes | BinaryIO] | None = None,
         timeout: float | httpx.Timeout | None = None,
     ) -> dict | _T:
-        """Execute GraphQL with optional multipart upload and a per-request timeout."""
+        """Execute a single GraphQL operation with optional upload and timeout.
+
+        Query responses use the read limit; mutations use a separate opt-in limit.
+        Strip leading GraphQL ignored tokens before identifying a read operation.
+        Unrecognized/fragment-first documents conservatively use mutation handling.
+        No operationName is sent, so multi-operation documents cannot execute.
+        """
+        document = re.sub(r"\A(?:[\s,\ufeff]|#[^\r\n]*)*", "", query)
+        mutating = re.match(r"(?:query\b|\{)", document) is None
+        response_limit = self._max_mutation_response_bytes if mutating else self._max_response_bytes
         operation = {"query": query, "variables": variables or {}}
         kwargs: dict = {"json": operation}
         if upload is not None:
@@ -231,7 +254,7 @@ class Uthana:
         if timeout is not None:
             kwargs["timeout"] = timeout
         body = await self._request_bytes(
-            "POST", self.graphql_url, max_bytes=self._max_response_bytes, **kwargs
+            "POST", self.graphql_url, max_bytes=response_limit, mutating=mutating, **kwargs
         )
         result = self._parse_graphql_response(body)
         data = result["data"]

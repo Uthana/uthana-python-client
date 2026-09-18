@@ -46,7 +46,8 @@ class CharactersModule(_BaseModule):
 
         Streams the source without an input-size limit by default and preserves
         the client's configured timeout. An explicit ``max_bytes`` instead reads a
-        bounded snapshot. Set ``timeout`` to override this request's timeout.
+        bounded snapshot with the byte upload's 360-second phase timeout (15 seconds
+        to connect). Set ``timeout`` to override either path's timeout.
         """
         if not file:
             raise UthanaError(400, "file is required (.glb or .fbx)")
@@ -74,7 +75,7 @@ class CharactersModule(_BaseModule):
             front_facing=front_facing,
             rerig_target=rerig_target,
             include_fingers=include_fingers,
-            timeout=self._client._timeout if timeout is None else timeout,
+            timeout=timeout,
             max_bytes=max_bytes,
         )
 
@@ -114,7 +115,7 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
         rerig_target: str | None = None,
         include_fingers: bool | None = None,
-        timeout: float | httpx.Timeout = httpx.Timeout(360, connect=15),
+        timeout: float | httpx.Timeout | None = None,
         max_bytes: int | None = 128 * 1024 * 1024,
     ) -> CreateCharacterResult:
         """Upload an existing byte snapshot without reopening its source file.
@@ -145,7 +146,7 @@ class CharactersModule(_BaseModule):
             q.CREATE_CHARACTER,
             variables,
             upload=(filename, content),
-            timeout=timeout,
+            timeout=httpx.Timeout(360, connect=15) if timeout is None else timeout,
         )
         return self._client._build_character_output(result={"data": data}, ext=ext)
 
@@ -159,7 +160,7 @@ class CharactersModule(_BaseModule):
         front_facing: bool | None = None,
         rerig_target: str | None = None,
         include_fingers: bool | None = None,
-        timeout: float | httpx.Timeout = httpx.Timeout(360, connect=15),
+        timeout: float | httpx.Timeout | None = None,
         max_bytes: int | None = 128 * 1024 * 1024,
     ) -> CreateCharacterResult:
         """Upload a character byte snapshot (sync)."""
@@ -306,8 +307,13 @@ class CharactersModule(_BaseModule):
                 upload=(os.path.basename(file), upload_content),
                 path="create_image_from_image",
             )
+        data = data or {}
         character_id = data.get("character_id", "")
         image = data.get("image") or {}
+        if not character_id or not image.get("key"):
+            raise UthanaError(
+                502, "Image upload returned no character or image key", kind="invalid_response"
+            )
         return await self._finalize_from_image(character_id, image.get("key", ""), name)
 
     def create_from_image_sync(

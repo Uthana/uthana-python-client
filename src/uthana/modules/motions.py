@@ -41,13 +41,15 @@ class MotionsModule(_BaseModule):
 
     async def get(self, motion_id: str) -> Motion:
         """Get a motion and its asset metadata, including native bundle information."""
-        return await self._client._graphql(
+        motion = await self._client._graphql(
             q.GET_MOTION,
             {"motion_id": motion_id},
             path="motion",
-            path_default={},
             return_type=Motion,
         )
+        if not motion:
+            raise UthanaError(404, "Motion not found", kind="http")
+        return motion
 
     def get_sync(self, motion_id: str) -> Motion:
         """Get a motion and its asset metadata (sync)."""

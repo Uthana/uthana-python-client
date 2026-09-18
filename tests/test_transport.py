@@ -58,10 +58,11 @@ def test_default_telemetry_and_custom_domain_are_preserved():
     client.close()
 
 
+@pytest.mark.parametrize("field", ["max_response_bytes", "max_mutation_response_bytes"])
 @pytest.mark.parametrize("limit", [0, -1, True, 1.5, "100"])
-def test_constructor_rejects_invalid_response_limit(limit):
+def test_constructor_rejects_invalid_response_limit(field, limit):
     with pytest.raises(ValueError, match="positive integers"):
-        Uthana("offline-test-key", telemetry=False, max_response_bytes=limit)
+        Uthana("offline-test-key", telemetry=False, **{field: limit})
 
 
 async def test_graphql_posts_auth_query_and_variables_without_environment_proxy(monkeypatch):
@@ -174,7 +175,9 @@ async def test_http_failures_are_structured_and_never_redirected_or_retried(stat
 
 async def test_huge_http_error_keeps_status_and_bounds_error_body():
     stream = ChunkedStream([b"x" * 65536] * 20)
-    client = make_client(lambda request: httpx.Response(401, stream=stream), max_response_bytes=32)
+    client = make_client(
+        lambda request: httpx.Response(401, stream=stream), max_mutation_response_bytes=32
+    )
     try:
         with pytest.raises(UthanaError) as error:
             await client._graphql("mutation{}")
@@ -241,7 +244,7 @@ async def test_graphql_response_limit_uses_decoded_bytes_and_stops_streaming():
     )
     try:
         with pytest.raises(UthanaError) as error:
-            await client._graphql("mutation{}")
+            await client._graphql("query{}")
     finally:
         client.close()
     assert error.value.kind == "response_too_large"
@@ -364,3 +367,77 @@ async def test_graphql_upload_streams_file_without_unbounded_reads_or_taking_own
     assert b'filename="large.fbx"' in requests[0].content
     assert b"x" * 200000 in requests[0].content
     upload.close()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "mutation { create { id } }",
+        "\ufeff ,# query { not_an_operation }\r\n mutation M { create { id } }",
+        "fragment F on Motion { id } mutation { create { ...F } }",
+    ],
+)
+@pytest.mark.parametrize("multipart_upload", [False, True])
+async def test_mutation_receipt_is_not_limited_by_query_bound(query, multipart_upload):
+    requests = []
+    receipt = {"create": {"id": "c1", "message": "x" * 2000}}
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"data": receipt})
+
+    client = make_client(handler, max_response_bytes=16)
+    try:
+        assert (
+            await client._graphql(
+                query, upload=("character.glb", b"glTF") if multipart_upload else None
+            )
+            == receipt
+        )
+    finally:
+        client.close()
+    assert len(requests) == 1
+
+
+async def test_explicit_mutation_limit_reports_uncertain_without_retry_and_closes_stream():
+    stream = ChunkedStream([b"x" * 65536] * 20)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, stream=stream)
+
+    client = make_client(handler, max_response_bytes=16, max_mutation_response_bytes=65536)
+    try:
+        with pytest.raises(UthanaError, match="may have succeeded") as error:
+            await client._graphql("mutation { create { id } }")
+    finally:
+        client.close()
+    assert error.value.kind == "uncertain"
+    assert error.value.status_code == 200
+    assert "before resubmitting" in error.value.message
+    assert len(calls) == 1
+    assert stream.consumed == 2
+    assert stream.closed
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "query Q { motion { id } }",
+        "{ motion { id } }",
+        "\ufeff ,# mutation { ignored }\r\nquery Q { motion { id } }",
+    ],
+)
+async def test_query_bound_still_applies_with_separate_mutation_limit(query):
+    client = make_client(
+        lambda _: httpx.Response(200, json={"data": {"motion": {"id": "m1"}}}),
+        max_response_bytes=16,
+        max_mutation_response_bytes=1000,
+    )
+    try:
+        with pytest.raises(UthanaError) as error:
+            await client._graphql(query)
+        assert error.value.kind == "response_too_large"
+    finally:
+        client.close()

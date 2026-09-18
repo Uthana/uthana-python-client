@@ -14,7 +14,7 @@ import pytest
 
 from uthana import Uthana
 from uthana.graphql import q
-from uthana.types import UthanaError
+from uthana.types import Error, UthanaError
 
 
 def client_for(handler) -> Uthana:
@@ -48,7 +48,20 @@ def multipart(request: httpx.Request) -> tuple[dict, dict, bytes, str]:
 async def test_motion_metadata_catalog_and_trim_contracts() -> None:
     requests = []
     motion = {"id": "motion1", "name": "Walk", "assets": [{"uid": "bundle", "metadata": {}}]}
-    catalog = {"org": {"id": "org1"}, "motions": [{"id": "motion1", "tags": ["walk"]}]}
+    catalog = {
+        "org": {"id": "org1"},
+        "motions": [
+            {
+                "id": "motion1",
+                "tags": {
+                    "Model": "video-to-motion-2.1",
+                    "input_fps": 30.0,
+                    "detected_human_ids": [1],
+                    "preserve_video_fps": False,
+                },
+            }
+        ],
+    }
 
     def handler(request):
         document = json.loads(request.content)
@@ -270,7 +283,7 @@ async def test_upload_bytes_limits_before_network() -> None:
 
 
 @pytest.mark.asyncio
-async def test_video_snapshot_alias_webm_and_explicit_name() -> None:
+async def test_video_snapshot_alias_and_explicit_name() -> None:
     captured = []
 
     def handler(request):
@@ -288,7 +301,7 @@ async def test_video_snapshot_alias_webm_and_explicit_name() -> None:
 
     client = client_for(handler)
     result = await client.vtm.create_from_bytes(
-        "clip.webm", b"snapshot", motion_name="  Name é  ", model="video-to-motion-v2"
+        "clip.mp4", b"snapshot", motion_name="  Name é  ", model="video-to-motion-v2"
     )
     operation, mapping, content, filename = captured[0]
     assert operation["variables"] == {
@@ -297,7 +310,7 @@ async def test_video_snapshot_alias_webm_and_explicit_name() -> None:
         "model": "video-to-motion-2.0",
     }
     assert mapping == {"0": ["variables.file"]}
-    assert filename == "clip.webm"
+    assert filename == "clip.mp4"
     assert content == b"snapshot"
     assert result == {"id": "job1", "status": "PENDING", "model": "video-to-motion-2.0"}
     client.close()
@@ -492,7 +505,7 @@ async def test_legacy_file_upload_keeps_open_stream_without_default_cap(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("max_bytes", [None, 100])
 @pytest.mark.parametrize("override", [None, 75.0])
-async def test_legacy_character_file_preserves_client_timeout(
+async def test_character_file_timeout_depends_on_stream_or_snapshot(
     tmp_path: Path, max_bytes: int | None, override: float | None
 ) -> None:
     source = tmp_path / "character.glb"
@@ -513,7 +526,11 @@ async def test_legacy_character_file_preserves_client_timeout(
         trust_env=False,
     )
     await client.characters.create_from_file(str(source), max_bytes=max_bytes, timeout=override)
-    assert observed[0]["read"] == (93.0 if override is None else override)
+    default = 93.0 if max_bytes is None else 360.0
+    assert observed[0]["read"] == (default if override is None else override)
+    assert observed[0]["connect"] == (
+        override if override is not None else (93.0 if max_bytes is None else 15.0)
+    )
     client.close()
 
 
@@ -532,3 +549,50 @@ async def test_legacy_file_upload_can_opt_into_bound(tmp_path: Path, kind: str) 
         else:
             await client.characters.create_from_image(str(source), max_bytes=3)
     client.close()
+
+
+@pytest.mark.parametrize("payload", [{"motion": None}, {}, {"motion": {}}])
+async def test_missing_motion_raises_not_found(payload):
+    client = client_for(lambda _: httpx.Response(200, json={"data": payload}))
+    try:
+        with pytest.raises(UthanaError, match="Motion not found") as error:
+            await client.motions.get("missing")
+        assert error.value.status_code == 404
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize(
+    "payload", [None, {}, {"character_id": "c1", "image": None}, {"image": {"key": "image1"}}]
+)
+async def test_image_upload_missing_receipt_never_starts_generation(tmp_path, payload):
+    source = tmp_path / "reference.png"
+    source.write_bytes(b"image")
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={"data": {"create_image_from_image": payload}})
+
+    client = client_for(handler)
+    try:
+        with pytest.raises(UthanaError, match="no character or image key") as error:
+            await client.characters.create_from_image(str(source))
+        assert error.value.kind == "invalid_response"
+        assert len(calls) == 1
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize("filename", ["video.webm", "video.WEBM"])
+async def test_webm_upload_rejected_before_network(tmp_path, filename):
+    source = tmp_path / filename
+    source.write_bytes(b"video")
+    client = client_for(lambda _: pytest.fail("Unsupported video must not reach the API"))
+    try:
+        with pytest.raises(Error, match="Unsupported"):
+            await client.vtm.create_from_bytes(filename, b"video")
+        with pytest.raises(Error, match="Unsupported"):
+            await client.vtm.create(str(source))
+    finally:
+        client.close()
