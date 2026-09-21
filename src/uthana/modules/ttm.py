@@ -88,8 +88,8 @@ class TtmModule(_BaseModule):
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
 
-        ``fast=True`` uses the faster TTM 3.0 variant (PAYG SKU ``text-to-motion-3.0-fast``).
-        ``fast=False`` (default) uses standard ``text-to-motion-3.0``. Both are $0.10/s.
+        ``fast=True`` uses the faster TTM 3.0 variant.
+        ``fast=False`` (default) uses standard TTM 3.0.
 
         Available to any account on the pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
         """
