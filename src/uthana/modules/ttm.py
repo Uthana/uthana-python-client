@@ -84,8 +84,12 @@ class TtmModule(_BaseModule):
         character_id: str | None = None,
         length: float | None = None,
         rewrite_prompt: bool | None = None,
+        fast: bool = False,
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
+
+        ``fast=True`` uses the faster TTM 3.0 variant (PAYG SKU ``text-to-motion-3.0-fast``).
+        ``fast=False`` (default) uses standard ``text-to-motion-3.0``. Both are $0.10/s.
 
         Available to any account on the pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
         """
@@ -95,6 +99,7 @@ class TtmModule(_BaseModule):
             "character_id": character_id,
             "length": length,
             "rewrite_prompt": rewrite_prompt,
+            "fast": fast,
         }
         data = await self._client._graphql(
             q.CREATE_TEXT_TO_MOTION_JOB, variables, path="create_text_to_motion_job.job"
@@ -109,6 +114,7 @@ class TtmModule(_BaseModule):
         character_id: str | None = None,
         length: float | None = None,
         rewrite_prompt: bool | None = None,
+        fast: bool = False,
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0), blocking.
 
@@ -122,5 +128,6 @@ class TtmModule(_BaseModule):
                 character_id=character_id,
                 length=length,
                 rewrite_prompt=rewrite_prompt,
+                fast=fast,
             )
         )

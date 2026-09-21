@@ -476,3 +476,42 @@ async def test_jobs_get_normalizes_timestamps() -> None:
     assert "created_at" not in job
     assert "started_at" not in job
     assert "ended_at" not in job
+
+
+# ---------------------------------------------------------------------------
+# ttm.create_job — fast flag
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ttm_create_job_includes_fast_variable() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "j1", "status": "QUEUED"})
+
+    job = await client.ttm.create_job(
+        "a person waving",
+        model="text-to-motion-3.0",
+        length=8,
+        rewrite_prompt=True,
+        fast=True,
+    )
+
+    assert job["id"] == "j1"
+    call_query, call_vars = client._graphql.call_args[0][0], client._graphql.call_args[0][1]
+    assert "$fast: Boolean" in call_query
+    assert "fast: $fast" in call_query
+    assert call_vars["fast"] is True
+    assert call_vars["model"] == "text-to-motion-3.0"
+    assert call_vars["length"] == 8
+    assert call_vars["rewrite_prompt"] is True
+
+
+@pytest.mark.asyncio
+async def test_ttm_create_job_defaults_fast_to_false() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "j2", "status": "QUEUED"})
+
+    await client.ttm.create_job("a person dancing", model="text-to-motion-3.0")
+
+    call_vars = client._graphql.call_args[0][1]
+    assert call_vars["fast"] is False

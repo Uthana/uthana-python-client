@@ -178,6 +178,7 @@ async def ttm_async_job():
         model="text-to-motion-3.0",
         length=8,            # optional, 4–10 seconds
         rewrite_prompt=True, # optional, default True
+        fast=True,           # optional; omit or False for standard TTM 3.0
         character_id=UthanaCharacters.tar,  # optional
     )
 
