@@ -12,7 +12,12 @@ from urllib.parse import quote
 import httpx
 
 from ..graphql import q
-from ..stitch import StitchParams, validate_stitch_params
+from ..stitch import (
+    AutoStitchInput,
+    StitchParams,
+    validate_auto_stitch_input,
+    validate_stitch_params,
+)
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
@@ -94,6 +99,44 @@ class MotionsModule(_BaseModule):
     def trim_sync(self, motion_id: str, start: float, end: float, name: str) -> Motion:
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
+
+    async def stitch_motions(
+        self,
+        options: AutoStitchInput,
+        *,
+        timeout: float | httpx.Timeout | None = 360,
+    ) -> dict:
+        """Sample and align two clips on the server, then create a separate motion.
+
+        Placement is relative to prefix ending facing: meters forward/right and
+        degrees clockwise. Omit placement for automatic continuation. Returned
+        preparation records effective trims and connection poses. No automatic retries.
+        Requires the server's additive AutomaticStitchInput API.
+        """
+        result = await self._client._graphql(
+            q.STITCH_MOTIONS,
+            {"auto_input": validate_auto_stitch_input(options)},
+            path="create_enhanced_stitched_motion",
+            timeout=timeout,
+        )
+        if (
+            not isinstance(result, dict)
+            or not isinstance(result.get("motion"), dict)
+            or not isinstance(result["motion"].get("id"), str)
+            or not result["motion"]["id"].strip()
+        ):
+            raise UthanaError(
+                200,
+                "Stitch returned no motion ID; inspect existing work before resubmitting",
+                kind="uncertain",
+            )
+        return result
+
+    def stitch_motions_sync(
+        self, options: AutoStitchInput, *, timeout: float | httpx.Timeout | None = 360
+    ) -> dict:
+        """Server-prepared stitching (sync)."""
+        return asyncio.run(self.stitch_motions(options, timeout=timeout))
 
     async def create_stitched_motion(
         self,

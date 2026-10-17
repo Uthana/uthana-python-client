@@ -3,7 +3,7 @@
 """Uthana Python client for the Uthana API."""
 
 from .client import Client, Uthana
-from .stitch import StitchParams
+from .stitch import AutoStitchInput, StitchParams, StitchPlacement
 from .types import (
     Character,
     CharacterPreviewResult,
@@ -37,6 +37,8 @@ __all__ = [
     "Motion",
     "Org",
     "StitchParams",
+    "AutoStitchInput",
+    "StitchPlacement",
     "TextToMotionResult",
     "TtmJobModelType",
     "TtmModelType",

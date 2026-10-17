@@ -100,3 +100,63 @@ def validate_stitch_params(params: Mapping[str, Any]) -> StitchParams:
         _vector(pose["pelvis_world_rot"], quaternion=True)
         _finite(pose["hips_forward_facing_world_yaw"])
     return cast(StitchParams, deepcopy(params))
+
+
+class StitchPlacement(TypedDict, total=False):
+    forward_m: float
+    right_m: float
+    facing_degrees: float
+
+
+class _AutoStitchRequired(TypedDict):
+    character_id: str
+    prefix_motion_id: str
+    suffix_motion_id: str
+
+
+class AutoStitchInput(_AutoStitchRequired, total=False):
+    stitch_duration: float
+    prefix_start_seconds: float
+    prefix_end_seconds: float
+    suffix_start_seconds: float
+    suffix_end_seconds: float
+    placement: StitchPlacement
+
+
+def validate_auto_stitch_input(value: Mapping[str, Any]) -> AutoStitchInput:
+    """Validate simple inputs without loading assets or submitting a mutation."""
+    required = {"character_id", "prefix_motion_id", "suffix_motion_id"}
+    allowed = required | {
+        "stitch_duration",
+        "prefix_start_seconds",
+        "prefix_end_seconds",
+        "suffix_start_seconds",
+        "suffix_end_seconds",
+        "placement",
+    }
+    if not isinstance(value, dict) or not required <= value.keys() or value.keys() - allowed:
+        raise ValueError("Automatic stitch input has missing or unsupported fields")
+    for key in required:
+        if not isinstance(value[key], str) or not value[key].strip() or len(value[key]) > 128:
+            raise ValueError(f"{key} must be a nonempty ID of at most 128 characters")
+    if not 0.1 <= _finite(value.get("stitch_duration", 1.0)) <= 3:
+        raise ValueError("stitch_duration must be between 0.1 and 3 seconds")
+    for label in ("prefix", "suffix"):
+        start = _finite(value.get(f"{label}_start_seconds", 0.0))
+        if start < 0:
+            raise ValueError("Trim start must be nonnegative")
+        if f"{label}_end_seconds" in value and _finite(value[f"{label}_end_seconds"]) <= start:
+            raise ValueError("Trim end must exceed start")
+    if "placement" in value:
+        placement = value["placement"]
+        if not isinstance(placement, dict) or placement.keys() - {
+            "forward_m",
+            "right_m",
+            "facing_degrees",
+        }:
+            raise ValueError("Unsupported placement fields")
+        for key, number in placement.items():
+            limit = 180 if key == "facing_degrees" else 100
+            if not -limit <= _finite(number) <= limit:
+                raise ValueError(f"{key} must be between {-limit} and {limit}")
+    return cast(AutoStitchInput, deepcopy(value))

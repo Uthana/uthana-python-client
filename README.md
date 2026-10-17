@@ -623,3 +623,24 @@ uthana_client = Uthana("your-api-key", domain="custom.example.com")
 ## License
 
 Apache 2.0
+
+
+### Server-prepared stitching (0.6.0)
+
+```python
+result = await client.motions.stitch_motions({
+    "character_id": character_id,
+    "prefix_motion_id": first_motion_id,
+    "suffix_motion_id": second_motion_id,
+    "stitch_duration": 1.0,
+    "placement": {"forward_m": 2.0, "facing_degrees": 90.0},
+})
+print(result["motion"]["id"], result["preparation"])
+```
+
+Omit placement for automatic continuation. Offsets use meters relative to the
+first clip's ending pelvis and facing; positive facing degrees turn right. Explicit
+forward zero requests no forward gap. Optional trim fields use seconds. The service
+returns effective trims and connection poses in `preparation`; review the output.
+Requires the additive `AutomaticStitchInput` backend deployed before client release.
+Existing sampled-pose stitching remains supported; uncertain writes are not retried.
