@@ -126,8 +126,8 @@ class MotionsModule(_BaseModule):
             and isinstance(motion_id := motion.get("id"), str)
             and bool(motion_id.strip())
         )
-        is_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
-        if not is_valid_motion or not is_valid_resolved_steps:
+        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
+        if not is_valid_motion or not has_valid_resolved_steps:
             raise UthanaError(
                 200,
                 "Stitch returned an incomplete result; inspect existing work before resubmitting",
