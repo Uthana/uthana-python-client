@@ -119,14 +119,15 @@ class MotionsModule(_BaseModule):
             path="stitch",
             timeout=timeout,
         )
-        if (
-            not isinstance(result, dict)
-            or not isinstance(result.get("motion"), dict)
-            or not isinstance(result["motion"].get("id"), str)
-            or not result["motion"]["id"].strip()
-            or not isinstance(result.get("resolved_steps"), list)
-            or len(result["resolved_steps"]) != 3
-        ):
+        motion = result.get("motion") if isinstance(result, dict) else None
+        resolved_steps = result.get("resolved_steps") if isinstance(result, dict) else None
+        valid_motion = (
+            isinstance(motion, dict)
+            and isinstance(motion_id := motion.get("id"), str)
+            and bool(motion_id.strip())
+        )
+        valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
+        if not valid_motion or not valid_resolved_steps:
             raise UthanaError(
                 200,
                 "Stitch returned an incomplete result; inspect existing work before resubmitting",

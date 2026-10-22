@@ -1,6 +1,7 @@
 """Shared contract fixtures and real SDK wire behavior, without paid API calls."""
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import httpx
@@ -73,3 +74,17 @@ async def test_missing_result_is_uncertain_without_retry():
     assert exc.value.kind == "uncertain"
     assert len(calls) == 1
     client.close()
+
+
+def test_normalization_preserves_caller_owned_nested_records():
+    request = deepcopy(FIXTURES["valid"][1]["input"])
+    request["steps"][2]["placement"] = {"forward_m": 0, "right_m": 0.5}
+    original = deepcopy(request)
+    normalized = validate_stitch_input(request)
+    assert validate_stitch_input(normalized) == normalized
+    first, _, last = normalized["steps"]
+    assert first["type"] == "motion" and last["type"] == "motion"
+    assert "range" in first and "placement" in last
+    first["range"]["end_frame"] = 50
+    last["placement"]["right_m"] = 10
+    assert request == original

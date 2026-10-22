@@ -626,3 +626,7 @@ uthana_client = Uthana("your-api-key", domain="custom.example.com")
 ## License
 
 Apache 2.0
+
+## Contributing
+
+See [AGENTS.md](AGENTS.md) for code style, validation, testing, and review conventions.
