@@ -258,49 +258,52 @@ Looping uses the published stitching/looping price per generated output second;
 it is not a free trim. Inspect the resulting motion's duration and repeated
 playback before claiming a seamless loop.
 
-## Stitch two existing motions
+## Stitch motions
 
-`motions.create_stitched_motion(character_id, prefix, suffix)` uses the enhanced
-stitch preview API; its `_sync` variant has the same arguments. It returns a new
-`Motion` dictionary synchronously. This is separate from single-motion looping.
+### Simple join
 
-Each clip is a `StitchParams` (import with `from uthana import StitchParams`)
-containing its motion ID, duration,
-trim times in seconds and matching fractions, root world position/rotation, and
-pelvis states at zero/lower/upper trim. See the
-[complete API input contract](https://uthana.com/docs/api/capabilities/stitch-loop-motions).
-Use `stitch_loop=False`, a positive `stitch_duration` (recommended 0.1–3 seconds),
-and `prompt=""` unless a transition prompt is intended. The prefix determines
-transition settings; keep both inputs consistent.
+Join two motions with automatic positioning. The server handles sampling and alignment.
 
 ```python
-import httpx
-
-# prefix_samples and suffix_samples are full StitchParams from your motion loader.
-stitched = await uthana_client.motions.create_stitched_motion(
-    character_id, prefix_samples, suffix_samples,
-    timeout=httpx.Timeout(360, connect=15),
-)
-print(stitched["id"])
+result = await uthana_client.motions.stitch({
+    "character_id": character_id,
+    "steps": [
+        {"type": "motion", "motion_id": first_motion_id},
+        {"type": "transition", "duration_seconds": 1.0},
+        {"type": "motion", "motion_id": second_motion_id},
+    ],
+})
+print(result["motion"]["id"], result["resolved_steps"])
 ```
 
-Supply real poses sampled on the same target character in a shared world scene.
-Positions are meters in Y-up space (x/z horizontal), rotations are approximately
-unit x/y/z/w quaternions, and facing yaw is in radians. The client validates
-fields, finite values, quaternion length, and trim time/fraction consistency
-before submitting. It copies validated inputs and never supplies guessed poses,
-samples animations, aligns the scene, or automatically retries a mutation.
+### Join with ranges and positioning
 
-Stitching defaults to 360-second HTTP phase limits and 15 seconds to connect when
-`timeout` is omitted or `None`; an explicit value overrides them. Allow the host
-enough time for the synchronous stitch or loop (at least 420 seconds with these
-phase limits, longer for transfers). Phase timeouts are not an overall deadline.
-If either response lacks a nonempty motion ID, the client raises
-`UthanaError(kind="uncertain")`: inspect existing work before resubmitting.
-Stitching keeps its published price per generated output second.
-Real playback and contact review are
-still required to establish transition quality. No pose-loader dependency is
-added to the Python client.
+Select source intervals and place the second motion one meter forward and half a meter right of the first motion’s ending pelvis, turned 45 degrees right. Placement is relative to the first motion’s ending facing.
+
+```python
+result = await uthana_client.motions.stitch({
+    "character_id": character_id,
+    "steps": [
+        {
+            "type": "motion",
+            "motion_id": first_motion_id,
+            "range": {"start_frame": 12, "end_frame": 60},
+        },
+        {"type": "transition", "duration_seconds": 1.5},
+        {
+            "type": "motion",
+            "motion_id": second_motion_id,
+            "range": {"start_seconds": 0.5, "end_seconds": 3.0},
+            "placement": {"forward_m": 1.0, "right_m": 0.5, "turn_degrees": 45.0},
+        },
+    ],
+})
+print(result["motion"]["id"], result["resolved_steps"])
+```
+
+Choose ranges that fit your source motions and leave the required transition context. Frame indices use each source’s native FPS; do not mix frames and seconds within one range. Inspect `resolved_steps` and review playback before accepting the result.
+
+The sync equivalent is `motions.stitch_sync(request)`. See [stitching](docs/stitching.md) for native frame/second ranges, relative placement, and recovery. Existing sampled-pose callers can use the [legacy method](docs/legacy-stitching.md).
 
 ## Video to motion (vtm)
 
@@ -623,3 +626,7 @@ uthana_client = Uthana("your-api-key", domain="custom.example.com")
 ## License
 
 Apache 2.0
+
+## Contributing
+
+See [AGENTS.md](AGENTS.md) for code style, validation, testing, and review conventions.

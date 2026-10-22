@@ -6,13 +6,19 @@ from __future__ import annotations
 
 import asyncio
 import math
-from typing import List, Literal
+from typing import List, Literal, cast
 from urllib.parse import quote
 
 import httpx
 
 from ..graphql import q
-from ..stitch import StitchParams, validate_stitch_params
+from ..stitch import (
+    StitchInput,
+    StitchParams,
+    StitchResult,
+    validate_stitch_input,
+    validate_stitch_params,
+)
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
@@ -94,6 +100,53 @@ class MotionsModule(_BaseModule):
     def trim_sync(self, motion_id: str, start: float, end: float, name: str) -> Motion:
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
+
+    async def stitch(
+        self,
+        options: StitchInput,
+        *,
+        timeout: float | httpx.Timeout | None = 360,
+    ) -> StitchResult:
+        """Stitch motion/transition/motion steps with server sampling and alignment.
+
+        Ranges use native frames or seconds. Omitted placement continues travel;
+        explicit placement uses relative meters and rightward degrees. No retries.
+        Requires server support for stitch(input: StitchInput!).
+        """
+        result = await self._client._graphql(
+            q.STITCH,
+            {"input": validate_stitch_input(options)},
+            path="stitch",
+            timeout=timeout,
+        )
+        motion = result.get("motion") if isinstance(result, dict) else None
+        resolved_steps = result.get("resolved_steps") if isinstance(result, dict) else None
+        is_valid_motion = (
+            isinstance(motion, dict)
+            and isinstance(motion_id := motion.get("id"), str)
+            and bool(motion_id.strip())
+        )
+        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
+        if not is_valid_motion:
+            raise UthanaError(
+                200,
+                "Stitch returned an invalid motion: expected a motion object with a nonempty id",
+                kind="uncertain",
+            )
+        if not has_valid_resolved_steps:
+            raise UthanaError(
+                200,
+                "Stitch result must include exactly three resolved steps: "
+                "a first motion, a middle transition, and a second motion",
+                kind="uncertain",
+            )
+        return cast(StitchResult, result)
+
+    def stitch_sync(
+        self, options: StitchInput, *, timeout: float | httpx.Timeout | None = 360
+    ) -> StitchResult:
+        """Server-prepared stitching (sync)."""
+        return asyncio.run(self.stitch(options, timeout=timeout))
 
     async def create_stitched_motion(
         self,

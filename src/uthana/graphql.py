@@ -190,6 +190,15 @@ query {
 }
 """
 
+    STITCH = """
+    mutation Stitch($input: StitchInput!) {
+        stitch(input: $input) {
+            motion { id name }
+            resolved_steps
+        }
+    }
+    """
+
     CREATE_ENHANCED_STITCHED_MOTION = """
 mutation CreateEnhancedStitchedMotion($stitch_input: MotionStitchInput!) {
     create_enhanced_stitched_motion(stitch_input: $stitch_input) {
