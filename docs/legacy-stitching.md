@@ -45,4 +45,3 @@ Stitching keeps its published price per generated output second.
 Real playback and contact review are
 still required to establish transition quality. No pose-loader dependency is
 added to the Python client.
-
