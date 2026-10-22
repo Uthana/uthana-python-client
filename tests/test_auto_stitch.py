@@ -1,60 +1,63 @@
+"""Shared contract fixtures and real SDK wire behavior, without paid API calls."""
+
 import json
+from pathlib import Path
 
 import httpx
 import pytest
 
 from uthana import Uthana
-from uthana.stitch import validate_auto_stitch_input
+from uthana.stitch import validate_stitch_input
 from uthana.types import UthanaError
 
-OPTIONS = dict(character_id="c1", prefix_motion_id="m1", suffix_motion_id="m2")
+FIXTURES = json.loads((Path(__file__).parent / "fixtures/stitch_contract.json").read_text())
+OPTIONS = FIXTURES["valid"][0]["input"]
 
 
-@pytest.mark.parametrize(
-    "options",
-    [OPTIONS, {**OPTIONS, "placement": {"forward_m": 0.0, "right_m": 1.0, "facing_degrees": 90.0}}],
-)
-async def test_wire_contract_and_timeout(options):
+@pytest.mark.parametrize("case", FIXTURES["valid"], ids=lambda c: c["name"])
+async def test_wire_contract_and_timeout(case):
     seen = []
+    options = case["input"]
+    expected = validate_stitch_input(options)
+    assert expected == case["normalized"]
 
     def handler(request):
         seen.append(request)
         return httpx.Response(
             200,
             json={
-                "data": {
-                    "create_enhanced_stitched_motion": {
-                        "motion": {"id": "m3"},
-                        "preparation": {"pose_samples_source": "server_sampled"},
-                    }
-                }
+                "data": {"stitch": {"motion": {"id": "m3"}, "resolved_steps": expected["steps"]}}
             },
         )
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
-    result = await client.motions.stitch_motions(options)
+    result = await client.motions.stitch(options)
     assert result["motion"]["id"] == "m3"
-    assert json.loads(seen[0].content)["variables"] == {"auto_input": options}
+    assert result["resolved_steps"] == expected["steps"]
+    assert json.loads(seen[0].content)["variables"] == {"input": expected}
+    assert "stitch(input: $input)" in json.loads(seen[0].content)["query"]
     assert seen[0].extensions["timeout"]["read"] == 360
     client.close()
 
 
-@pytest.mark.parametrize(
-    "bad",
-    [
-        {"stitch_duration": True},
-        {"stitch_duration": float("inf")},
-        {"placement": {"forward_m": "2"}},
-        {"placement": {"forward_m": 101}},
-        {"placement": {"facing_degrees": 181}},
-        {"prefix_start_seconds": 2.0, "prefix_end_seconds": 1.0},
-        {"prefix_end_seconds": None},
-        {"extra": 1},
-    ],
-)
-def test_invalid_options(bad):
+@pytest.mark.parametrize("case", FIXTURES["invalid"], ids=lambda c: c["name"])
+def test_invalid_options(case):
     with pytest.raises(ValueError):
-        validate_auto_stitch_input({**OPTIONS, **bad})
+        validate_stitch_input(case["input"])
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_values(value):
+    options = {
+        **OPTIONS,
+        "steps": [
+            OPTIONS["steps"][0],
+            {"type": "transition", "duration_seconds": value},
+            OPTIONS["steps"][2],
+        ],
+    }
+    with pytest.raises(ValueError):
+        validate_stitch_input(options)
 
 
 async def test_missing_result_is_uncertain_without_retry():
@@ -62,13 +65,11 @@ async def test_missing_result_is_uncertain_without_retry():
 
     def handler(request):
         calls.append(request)
-        return httpx.Response(
-            200, json={"data": {"create_enhanced_stitched_motion": {"motion": None}}}
-        )
+        return httpx.Response(200, json={"data": {"stitch": {"motion": None}}})
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
     with pytest.raises(UthanaError) as exc:
-        await client.motions.stitch_motions(OPTIONS)
+        await client.motions.stitch(OPTIONS)
     assert exc.value.kind == "uncertain"
     assert len(calls) == 1
     client.close()

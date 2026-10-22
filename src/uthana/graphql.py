@@ -190,11 +190,11 @@ query {
 }
 """
 
-    STITCH_MOTIONS = """
-    mutation StitchMotions($auto_input: AutomaticStitchInput!) {
-        create_enhanced_stitched_motion(auto_input: $auto_input) {
+    STITCH = """
+    mutation Stitch($input: StitchInput!) {
+        stitch(input: $input) {
             motion { id name }
-            preparation
+            resolved_steps
         }
     }
     """

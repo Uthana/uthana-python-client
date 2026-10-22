@@ -6,16 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import math
-from typing import List, Literal
+from typing import List, Literal, cast
 from urllib.parse import quote
 
 import httpx
 
 from ..graphql import q
 from ..stitch import (
-    AutoStitchInput,
+    StitchInput,
     StitchParams,
-    validate_auto_stitch_input,
+    StitchResult,
+    validate_stitch_input,
     validate_stitch_params,
 )
 from ..types import (
@@ -100,23 +101,22 @@ class MotionsModule(_BaseModule):
         """Create a trimmed motion without enabling looping (sync)."""
         return asyncio.run(self.trim(motion_id, start, end, name))
 
-    async def stitch_motions(
+    async def stitch(
         self,
-        options: AutoStitchInput,
+        options: StitchInput,
         *,
         timeout: float | httpx.Timeout | None = 360,
-    ) -> dict:
-        """Sample and align two clips on the server, then create a separate motion.
+    ) -> StitchResult:
+        """Stitch motion/transition/motion steps with server sampling and alignment.
 
-        Placement is relative to prefix ending facing: meters forward/right and
-        degrees clockwise. Omit placement for automatic continuation. Returned
-        preparation records effective trims and connection poses. No automatic retries.
-        Requires the server's additive AutomaticStitchInput API.
+        Ranges use native frames or seconds. Omitted placement continues travel;
+        explicit placement uses relative meters and rightward degrees. No retries.
+        Requires server support for stitch(input: StitchInput!).
         """
         result = await self._client._graphql(
-            q.STITCH_MOTIONS,
-            {"auto_input": validate_auto_stitch_input(options)},
-            path="create_enhanced_stitched_motion",
+            q.STITCH,
+            {"input": validate_stitch_input(options)},
+            path="stitch",
             timeout=timeout,
         )
         if (
@@ -124,19 +124,21 @@ class MotionsModule(_BaseModule):
             or not isinstance(result.get("motion"), dict)
             or not isinstance(result["motion"].get("id"), str)
             or not result["motion"]["id"].strip()
+            or not isinstance(result.get("resolved_steps"), list)
+            or len(result["resolved_steps"]) != 3
         ):
             raise UthanaError(
                 200,
-                "Stitch returned no motion ID; inspect existing work before resubmitting",
+                "Stitch returned an incomplete result; inspect existing work before resubmitting",
                 kind="uncertain",
             )
-        return result
+        return cast(StitchResult, result)
 
-    def stitch_motions_sync(
-        self, options: AutoStitchInput, *, timeout: float | httpx.Timeout | None = 360
-    ) -> dict:
+    def stitch_sync(
+        self, options: StitchInput, *, timeout: float | httpx.Timeout | None = 360
+    ) -> StitchResult:
         """Server-prepared stitching (sync)."""
-        return asyncio.run(self.stitch_motions(options, timeout=timeout))
+        return asyncio.run(self.stitch(options, timeout=timeout))
 
     async def create_stitched_motion(
         self,
