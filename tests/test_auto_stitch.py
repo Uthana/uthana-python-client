@@ -61,16 +61,26 @@ def test_nonfinite_values(value):
         validate_stitch_input(options)
 
 
-async def test_missing_result_is_uncertain_without_retry():
+@pytest.mark.parametrize(
+    ("result", "message"),
+    [
+        ({"motion": None}, "invalid motion"),
+        ({"motion": {"id": " "}}, "invalid motion"),
+        ({"motion": {"id": "m3"}}, "exactly three resolved steps"),
+        ({"motion": {"id": "m3"}, "resolved_steps": []}, "exactly three resolved steps"),
+    ],
+)
+async def test_invalid_result_is_specific_and_uncertain_without_retry(result, message):
     calls = []
 
     def handler(request):
         calls.append(request)
-        return httpx.Response(200, json={"data": {"stitch": {"motion": None}}})
+        return httpx.Response(200, json={"data": {"stitch": result}})
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
     with pytest.raises(UthanaError) as exc:
         await client.motions.stitch(OPTIONS)
+    assert message in str(exc.value)
     assert exc.value.kind == "uncertain"
     assert len(calls) == 1
     client.close()

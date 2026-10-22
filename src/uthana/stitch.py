@@ -257,7 +257,10 @@ def _validate_motion_step(value: object, *, arriving: bool) -> MotionStep:
         value, required={"type", "motion_id"}, allowed={"type", "motion_id", "range", "placement"}
     )
     if selected["type"] != "motion":
-        raise ValueError("Supported sequence is motion, transition, motion")
+        raise ValueError(
+            "Must include exactly three steps: a first motion, "
+            "a middle transition, and a second motion"
+        )
     result: MotionStep = {
         "type": "motion",
         "motion_id": _stitch_id(selected["motion_id"]),
@@ -273,7 +276,10 @@ def _validate_motion_step(value: object, *, arriving: bool) -> MotionStep:
 def _validate_transition_step(value: object) -> TransitionStep:
     selected = _allowed_fields(value, required={"type"}, allowed={"type", "duration_seconds"})
     if selected["type"] != "transition":
-        raise ValueError("Supported sequence is motion, transition, motion")
+        raise ValueError(
+            "Must include exactly three steps: a first motion, "
+            "a middle transition, and a second motion"
+        )
     duration = float(_finite(selected.get("duration_seconds", DEFAULT_TRANSITION_SECONDS)))
     if not MIN_TRANSITION_SECONDS <= duration <= MAX_TRANSITION_SECONDS:
         raise ValueError("Transition duration must be 0.1-3 seconds")
@@ -287,7 +293,10 @@ def validate_stitch_input(value: object) -> StitchInput:
     )
     character_id = _stitch_id(request["character_id"])
     if not isinstance(steps := request["steps"], list) or len(steps) != 3:
-        raise ValueError("Supported sequence is motion, transition, motion")
+        raise ValueError(
+            "Must include exactly three steps: a first motion, "
+            "a middle transition, and a second motion"
+        )
     return {
         "character_id": character_id,
         "steps": [

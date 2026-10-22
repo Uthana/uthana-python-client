@@ -127,10 +127,17 @@ class MotionsModule(_BaseModule):
             and bool(motion_id.strip())
         )
         has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
-        if not is_valid_motion or not has_valid_resolved_steps:
+        if not is_valid_motion:
             raise UthanaError(
                 200,
-                "Stitch returned an incomplete result; inspect existing work before resubmitting",
+                "Stitch returned an invalid motion: expected a motion object with a nonempty id",
+                kind="uncertain",
+            )
+        if not has_valid_resolved_steps:
+            raise UthanaError(
+                200,
+                "Stitch result must include exactly three resolved steps: "
+                "a first motion, a middle transition, and a second motion",
                 kind="uncertain",
             )
         return cast(StitchResult, result)
