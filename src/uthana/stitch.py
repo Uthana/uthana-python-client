@@ -184,8 +184,8 @@ def _allowed_fields(value: object, *, required: set[str], allowed: set[str]) -> 
     if not isinstance(value, dict):
         raise ValueError("Stitch objects must be dictionaries")
     missing_fields = not required <= value.keys()
-    unsupported_fields = bool(value.keys() - allowed)
-    if missing_fields or unsupported_fields:
+    has_unsupported_fields = bool(value.keys() - allowed)
+    if missing_fields or has_unsupported_fields:
         raise ValueError("Stitch input has missing or unsupported fields")
     # Membership above establishes every key is one of the allowed strings.
     return cast(dict[str, object], value)
@@ -213,9 +213,9 @@ def _seconds(value: object) -> float:
 def _validate_range(value: object) -> StitchRange:
     fields = {"start_frame", "end_frame", "start_seconds", "end_seconds"}
     selected = _allowed_fields(value, required=set(), allowed=fields)
-    uses_frames = bool(selected.keys() & {"start_frame", "end_frame"})
-    uses_seconds = bool(selected.keys() & {"start_seconds", "end_seconds"})
-    if uses_frames and uses_seconds:
+    has_frame_range = bool(selected.keys() & {"start_frame", "end_frame"})
+    has_second_range = bool(selected.keys() & {"start_seconds", "end_seconds"})
+    if has_frame_range and has_second_range:
         raise ValueError("Use frames or seconds within a range, not both")
     result: StitchRange = {}
     if "start_frame" in selected:
@@ -226,8 +226,8 @@ def _validate_range(value: object) -> StitchRange:
         result["start_seconds"] = _seconds(selected["start_seconds"])
     if "end_seconds" in selected:
         result["end_seconds"] = _seconds(selected["end_seconds"])
-    start = result.get("start_frame", 0) if uses_frames else result.get("start_seconds", 0.0)
-    end = result.get("end_frame") if uses_frames else result.get("end_seconds")
+    start = result.get("start_frame", 0) if has_frame_range else result.get("start_seconds", 0.0)
+    end = result.get("end_frame") if has_frame_range else result.get("end_seconds")
     if end is not None and end <= start:
         raise ValueError("Range end must exceed start")
     return result
