@@ -85,13 +85,14 @@ class Uthana:
                 raise ValueError("Supply either api_key or access_token, not both")
             if isinstance(access_token, httpx.Auth):
                 self._auth = access_token
-            elif (
-                not isinstance(access_token, str)
-                or not access_token
-                or any(character.isspace() for character in access_token)
-            ):
-                raise ValueError("access_token must be nonempty text without whitespace")
             else:
+                if not isinstance(access_token, str):
+                    raise ValueError("access_token must be text")
+                access_token = access_token.strip()
+                if not access_token:
+                    raise ValueError("access_token must not be empty after trimming whitespace")
+                if any(character.isspace() for character in access_token):
+                    raise ValueError("access_token must not contain internal whitespace")
                 self._auth = _BearerAuth(access_token)
         else:
             if api_key is None:

@@ -4,7 +4,7 @@ import pytest
 from uthana import Uthana
 
 
-@pytest.mark.parametrize("token", ["", "with space", "line\nbreak"])
+@pytest.mark.parametrize("token", ["", " \t\n", "with space", "line\nbreak", 123, False])
 def test_invalid_bearer_token(token):
     with pytest.raises(ValueError, match="access_token"):
         Uthana(access_token=token, telemetry=False)
@@ -15,16 +15,15 @@ def test_conflicting_credentials():
         Uthana("key", access_token="token", telemetry=False)
 
 
-async def test_bearer_reaches_async_transport_without_basic_auth():
+@pytest.mark.parametrize("token", ["delegated-token", " \tdelegated-token\r\n"])
+async def test_bearer_reaches_async_transport_without_basic_auth(token):
     calls = []
 
     def handler(request):
         calls.append(request)
         return httpx.Response(200, json={"data": {"user": {"id": "u1"}}})
 
-    client = Uthana(
-        access_token="delegated-token", telemetry=False, transport=httpx.MockTransport(handler)
-    )
+    client = Uthana(access_token=token, telemetry=False, transport=httpx.MockTransport(handler))
     await client._graphql("{ user { id } }")
     assert len(calls) == 1
     assert calls[0].headers["Authorization"] == "Bearer delegated-token"
