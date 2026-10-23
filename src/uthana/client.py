@@ -6,7 +6,7 @@ import json
 import re
 import uuid
 from importlib.metadata import version as _pkg_version
-from typing import BinaryIO, TypeVar, cast, overload
+from typing import BinaryIO, Generator, TypeVar, cast, overload
 
 import httpx
 
@@ -31,6 +31,15 @@ from .types import (
 _T = TypeVar("_T")
 
 
+class _BearerAuth(httpx.Auth):
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        request.headers["Authorization"] = f"Bearer {self._token}"
+        yield request
+
+
 class Uthana:
     """Main client for the Uthana API. Use modules for organized access:
 
@@ -44,8 +53,9 @@ class Uthana:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
+        access_token: str | httpx.Auth | None = None,
         domain: str | None = None,
         timeout: float | httpx.Timeout = DEFAULT_TIMEOUT,
         telemetry: bool = True,
@@ -58,6 +68,7 @@ class Uthana:
 
         Args:
             api_key: Your Uthana API key from account settings.
+            access_token: Delegated bearer token or HTTPX refreshable Auth; exclusive with api_key.
             domain: API host (e.g. "uthana.com"). Defaults to production when omitted.
             timeout: Request timeout in seconds or an HTTPX timeout configuration.
             telemetry: Log initialization when true; false avoids constructor network calls.
@@ -68,6 +79,24 @@ class Uthana:
                 it raises kind="uncertain": the operation may have succeeded; do not resubmit
                 without reconciling the result. Mutations are unlimited by default.
         """
+        self._auth: httpx.Auth
+        if access_token is not None:
+            if api_key is not None:
+                raise ValueError("Supply either api_key or access_token, not both")
+            if isinstance(access_token, httpx.Auth):
+                self._auth = access_token
+            elif (
+                not isinstance(access_token, str)
+                or not access_token
+                or any(character.isspace() for character in access_token)
+            ):
+                raise ValueError("access_token must be nonempty text without whitespace")
+            else:
+                self._auth = _BearerAuth(access_token)
+        else:
+            if api_key is None:
+                raise ValueError("Supply api_key or access_token")
+            self._auth = httpx.BasicAuth(api_key, "")
         domain = domain or "uthana.com"
         self.base_url = f"https://{domain}"
         self.graphql_url = f"{self.base_url}/graphql"
@@ -80,7 +109,7 @@ class Uthana:
         self._max_response_bytes = max_response_bytes
         self._max_mutation_response_bytes = max_mutation_response_bytes
         self.session = httpx.Client(
-            auth=(api_key, ""), timeout=timeout, trust_env=trust_env, follow_redirects=False
+            auth=self._auth, timeout=timeout, trust_env=trust_env, follow_redirects=False
         )
         if telemetry:
             self._log_init()
@@ -152,7 +181,7 @@ class Uthana:
         """
         self._validate_response_limit(max_bytes)
         async with httpx.AsyncClient(
-            auth=(self._api_key, ""),
+            auth=self._auth,
             timeout=self._timeout,
             transport=self._transport,
             trust_env=self._trust_env,

@@ -630,3 +630,17 @@ Apache 2.0
 ## Contributing
 
 See [AGENTS.md](AGENTS.md) for code style, validation, testing, and review conventions.
+
+### Delegated authentication
+
+For integrations that obtain a scoped access token through account linking:
+
+```python
+client = Uthana(access_token=access_token, telemetry=False)
+```
+
+Supply either an API key or `access_token`. Existing API-key calls remain supported.
+`access_token` also accepts an `httpx.Auth` implementation for integrations that refresh
+credentials before requests. Use its asynchronous auth flow for asynchronous client methods;
+synchronous helpers and initialization telemetry require a synchronous flow.
+The client does not perform OAuth account linking or retry paid mutations automatically.
