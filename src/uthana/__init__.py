@@ -3,6 +3,7 @@
 """Uthana Python client for the Uthana API."""
 
 from .client import Client, Uthana
+from .file_formats import detect_file_format
 from .stitch import (
     MotionStep,
     StitchInput,
@@ -61,4 +62,5 @@ __all__ = [
     "VideoToMotionResult",
     "VtmModelType",
     "detect_mesh_format",
+    "detect_file_format",
 ]

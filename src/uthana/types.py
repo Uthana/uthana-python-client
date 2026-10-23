@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
+from .file_formats import MESH_HEADER_BYTES, detect_file_format
+
 # -----------------------------------------------------------------------------
 # Exceptions
 # -----------------------------------------------------------------------------
@@ -183,12 +185,6 @@ class UthanaCharacters:
 def detect_mesh_format(filepath: str) -> str | None:
     """Detect mesh format from file header. Returns 'glb', 'fbx', or None if unknown."""
     with open(filepath, "rb") as f:
-        header = f.read(20)
-
-    if header[:4] == b"glTF":
-        return "glb"
-    if header.startswith(b"Kaydara FBX Binary"):
-        return "fbx"
-    if header.startswith(b"; FBX"):
-        return "fbx"
-    return None
+        header = f.read(MESH_HEADER_BYTES)
+    detected = detect_file_format(header)
+    return detected if detected in {"glb", "fbx"} else None
