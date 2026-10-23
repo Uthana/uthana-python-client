@@ -86,13 +86,15 @@ class Uthana:
             if isinstance(access_token, httpx.Auth):
                 self._auth = access_token
             else:
-                if not isinstance(access_token, str):
-                    raise ValueError("access_token must be text")
-                access_token = access_token.strip()
-                if not access_token:
-                    raise ValueError("access_token must not be empty after trimming whitespace")
-                if any(character.isspace() for character in access_token):
-                    raise ValueError("access_token must not contain internal whitespace")
+                if isinstance(access_token, str):
+                    access_token = access_token.strip()
+                is_valid_access_token = (
+                    isinstance(access_token, str)
+                    and bool(access_token)
+                    and not any(character.isspace() for character in access_token)
+                )
+                if not is_valid_access_token:
+                    raise ValueError("access_token must be non-empty and without whitespace")
                 self._auth = _BearerAuth(access_token)
         else:
             if api_key is None:
