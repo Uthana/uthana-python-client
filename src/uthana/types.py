@@ -81,6 +81,17 @@ class Motion(TypedDict, total=False):
     tags: dict[str, object]
 
 
+class ShareLink(TypedDict):
+    """Public viewer link from motions.share; preview_url opens without an account."""
+
+    character_id: str
+    motion_id: str
+    start: float
+    end: float
+    preview_url: str
+    png_url: str
+
+
 class Job(TypedDict, total=False):
     """Job object from jobs.get, jobs.list, or vtm.create. Poll until status is FINISHED or FAILED.
 

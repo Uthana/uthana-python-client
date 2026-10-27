@@ -1,6 +1,6 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
-"""Motion management: list, download, delete, rename, favorite, bake, locomotion."""
+"""Motion management: list, download, share, delete, rename, favorite, bake, locomotion."""
 
 from __future__ import annotations
 
@@ -23,15 +23,34 @@ from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
     OutputFormat,
+    ShareLink,
     TextToMotionResult,
     UthanaCharacters,
     UthanaError,
 )
 from ._base import _BaseModule
 
+# Social preview image rendered for a share link: the smallest Open Graph image size that
+# X accepts (LinkedIn recommends the same 1.91:1 ratio). The Uthana web app uses these values.
+SHARE_IMAGE_FPS = 10
+SHARE_IMAGE_WIDTH_PX = 300
+SHARE_IMAGE_HEIGHT_PX = 157
+SHARE_FULL_WINDOW = (0.0, 1.0)
+
+
+def _validate_share_window(start: float, end: float) -> None:
+    """Reject a playback window unless it is a finite fraction range 0 <= start < end <= 1."""
+    is_boolean = isinstance(start, bool) or isinstance(end, bool)
+    is_numeric = isinstance(start, (int, float)) and isinstance(end, (int, float))
+    if is_boolean or not is_numeric:
+        raise ValueError("Share window fractions must be numbers satisfying 0 <= start < end <= 1")
+    has_finite_values = math.isfinite(start) and math.isfinite(end)
+    if not has_finite_values or not 0 <= start < end <= 1:
+        raise ValueError("Share window fractions must be finite and satisfy 0 <= start < end <= 1")
+
 
 class MotionsModule(_BaseModule):
-    """Motion management: list, download, delete, rename, favorite, bake, locomotion."""
+    """Motion management: list, download, share, delete, rename, favorite, bake, locomotion."""
 
     async def list(self) -> list[Motion]:
         """List all motions for the authenticated user."""
@@ -427,6 +446,77 @@ class MotionsModule(_BaseModule):
             self.preview(
                 character_id, motion_id, format=format, max_bytes=max_bytes, timeout=timeout
             )
+        )
+
+    async def share(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        start: float = 0.0,
+        end: float = 1.0,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> ShareLink:
+        """Create a public link that opens this motion on this character in the Uthana viewer.
+
+        Anyone with ``preview_url`` can open the 3D viewer without an account, and the
+        link stays public. The owner already sees the motion while logged in and does not
+        need it; use it to show a result to someone outside the organization or to
+        Uthana support. ``start`` and ``end`` are normalized fractions of the source
+        duration (``0 <= start < end <= 1``) that narrow the viewer's playback window;
+        the motion itself is unchanged. The backend also renders a small social preview
+        image, returned as ``png_url``. Creating the same link again is harmless.
+        """
+        _validate_share_window(start, end)
+        data = await self._client._graphql(
+            q.CREATE_SHARE_LINK,
+            {
+                "character_id": character_id,
+                "motion_id": motion_id,
+                "start": start,
+                "end": end,
+                "fps": SHARE_IMAGE_FPS,
+                "wd": SHARE_IMAGE_WIDTH_PX,
+                "ht": SHARE_IMAGE_HEIGHT_PX,
+            },
+            path="create_share_link",
+            timeout=timeout,
+        )
+        png_url = data.get("png_url") if isinstance(data, dict) else None
+        if not isinstance(png_url, str) or not png_url.strip():
+            raise UthanaError(
+                502,
+                "create_share_link returned no preview image URL, so the link may not be "
+                "public. Open the motion in the Uthana app and use Share before sending it.",
+                kind="uncertain",
+            )
+        character = quote(character_id, safe="")
+        motion = quote(motion_id, safe="")
+        preview_url = f"{self._client.base_url}/app/preview/{character}/{motion}"
+        if (start, end) != SHARE_FULL_WINDOW:
+            # The web app sends the window with two decimals; the viewer reads it the same way.
+            preview_url += f"?start={start:.2f}&end={end:.2f}"
+        return ShareLink(
+            character_id=character_id,
+            motion_id=motion_id,
+            start=start,
+            end=end,
+            preview_url=preview_url,
+            png_url=png_url,
+        )
+
+    def share_sync(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        start: float = 0.0,
+        end: float = 1.0,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> ShareLink:
+        """Create a public viewer link for a motion on a character (sync)."""
+        return asyncio.run(
+            self.share(character_id, motion_id, start=start, end=end, timeout=timeout)
         )
 
     async def delete(self, motion_id: str) -> Motion:
