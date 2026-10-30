@@ -126,7 +126,7 @@ class MotionsModule(_BaseModule):
             and isinstance(motion_id := motion.get("id"), str)
             and bool(motion_id.strip())
         )
-        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
+        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 2
         if not is_valid_motion:
             raise UthanaError(
                 200,
@@ -136,8 +136,7 @@ class MotionsModule(_BaseModule):
         if not has_valid_resolved_steps:
             raise UthanaError(
                 200,
-                "Stitch result must include exactly three resolved steps: "
-                "a first motion, a middle transition, and a second motion",
+                "Stitch result must include exactly two resolved steps",
                 kind="uncertain",
             )
         return cast(StitchResult, result)
