@@ -288,7 +288,7 @@ async def test_upload_bytes_limits_before_network() -> None:
     [("video-to-motion-v2", "video-to-motion-2.0"), ("video-to-motion-3.0", "video-to-motion-3.0")],
 )
 async def test_video_snapshot_alias_and_explicit_name(
-    model: VtmModelType, expected_model: str
+    *, model: VtmModelType, expected_model: str
 ) -> None:
     captured = []
 
