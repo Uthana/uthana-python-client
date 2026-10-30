@@ -14,7 +14,7 @@ import pytest
 
 from uthana import Uthana
 from uthana.graphql import q
-from uthana.types import Error, UthanaError
+from uthana.types import Error, UthanaError, VtmModelType
 
 
 def client_for(handler) -> Uthana:
@@ -283,7 +283,11 @@ async def test_upload_bytes_limits_before_network() -> None:
 
 
 @pytest.mark.asyncio
-async def test_video_snapshot_alias_and_explicit_name() -> None:
+@pytest.mark.parametrize(
+    "model,expected_model",
+    [("video-to-motion-v2", "video-to-motion-2.0"), ("video-to-motion-3.0", "video-to-motion-3.0")],
+)
+async def test_video_snapshot_alias_and_explicit_name(model: VtmModelType, expected_model: str) -> None:
     captured = []
 
     def handler(request):
@@ -293,7 +297,7 @@ async def test_video_snapshot_alias_and_explicit_name() -> None:
             json={
                 "data": {
                     "create_video_to_motion": {
-                        "job": {"id": "job1", "status": "PENDING", "model": "video-to-motion-2.0"}
+                        "job": {"id": "job1", "status": "PENDING", "model": expected_model}
                     }
                 }
             },
@@ -301,18 +305,18 @@ async def test_video_snapshot_alias_and_explicit_name() -> None:
 
     client = client_for(handler)
     result = await client.vtm.create_from_bytes(
-        "clip.mp4", b"snapshot", motion_name="  Name é  ", model="video-to-motion-v2"
+        "clip.mp4", b"snapshot", motion_name="  Name é  ", model=model
     )
     operation, mapping, content, filename = captured[0]
     assert operation["variables"] == {
         "file": None,
         "motion_name": "  Name é  ",
-        "model": "video-to-motion-2.0",
+        "model": expected_model,
     }
     assert mapping == {"0": ["variables.file"]}
     assert filename == "clip.mp4"
     assert content == b"snapshot"
-    assert result == {"id": "job1", "status": "PENDING", "model": "video-to-motion-2.0"}
+    assert result == {"id": "job1", "status": "PENDING", "model": expected_model}
     client.close()
 
 

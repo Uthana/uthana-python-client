@@ -342,7 +342,16 @@ async def video_to_motion():
 asyncio.run(video_to_motion())
 ```
 
-**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`.
+```python
+job = await client.vtm.create(
+    "path/to/dance.mp4", motion_name="my_dance", model="video-to-motion-3.0"
+)
+# Poll client.jobs.get(job["id"]) until status is FINISHED or FAILED.
+```
+
+**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`, `video-to-motion-3.0`.
+
+Select `video-to-motion-3.0` for foot IK and high-quality hands, included at $0.06 per input video second on pay-as-you-go. Versions 2.0 and 2.1 remain $0.05 per input second. All versions return the final motion at `job.result.result.id` after the job finishes.
 
 ## Characters
 
