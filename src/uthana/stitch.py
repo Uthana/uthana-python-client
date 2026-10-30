@@ -127,26 +127,22 @@ class StitchPlacement(TypedDict, total=False):
 
 
 class _MotionStepRequired(TypedDict):
-    type: Literal["motion"]
     motion_id: str
 
 
 class MotionStep(_MotionStepRequired, total=False):
     range: StitchRange
     placement: StitchPlacement
+    transition: "StitchTransition"
 
 
-class _TransitionStepRequired(TypedDict):
-    type: Literal["transition"]
-
-
-class TransitionStep(_TransitionStepRequired, total=False):
+class StitchTransition(TypedDict, total=False):
     duration_seconds: float
 
 
 class StitchInput(TypedDict):
     character_id: str
-    steps: list[MotionStep | TransitionStep]
+    steps: list[MotionStep]
 
 
 class ResolvedRange(TypedDict):
@@ -161,23 +157,22 @@ class AutomaticPlacement(TypedDict):
 
 
 class _ResolvedMotionRequired(TypedDict):
-    type: Literal["motion"]
     motion_id: str
     range: ResolvedRange
 
 
 class ResolvedMotionStep(_ResolvedMotionRequired, total=False):
     placement: StitchPlacement | AutomaticPlacement
+    transition: "ResolvedTransition"
 
 
-class ResolvedTransitionStep(TypedDict):
-    type: Literal["transition"]
+class ResolvedTransition(TypedDict):
     duration_seconds: float
 
 
 class StitchResult(TypedDict):
     motion: Motion
-    resolved_steps: list[ResolvedMotionStep | ResolvedTransitionStep]
+    resolved_steps: list[ResolvedMotionStep]
 
 
 def _allowed_fields(value: object, *, required: set[str], allowed: set[str]) -> dict[str, object]:
@@ -252,17 +247,20 @@ def _validate_placement(value: object) -> StitchPlacement:
     return {"forward_m": forward, "right_m": right, "turn_degrees": turn, "absolute": False}
 
 
+def _validate_transition(value: object, *, outgoing: bool) -> StitchTransition:
+    # The final transition has transport checks only, never semantic duration bounds.
+    selected = _allowed_fields(value, required=set(), allowed={"duration_seconds"})
+    duration = float(_finite(selected.get("duration_seconds", DEFAULT_TRANSITION_SECONDS)))
+    if outgoing and not MIN_TRANSITION_SECONDS <= duration <= MAX_TRANSITION_SECONDS:
+        raise ValueError("Transition duration must be 0.1-3 seconds")
+    return {"duration_seconds": duration}
+
+
 def _validate_motion_step(value: object, *, arriving: bool) -> MotionStep:
     selected = _allowed_fields(
-        value, required={"type", "motion_id"}, allowed={"type", "motion_id", "range", "placement"}
+        value, required={"motion_id"}, allowed={"motion_id", "range", "placement", "transition"}
     )
-    if selected["type"] != "motion":
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
     result: MotionStep = {
-        "type": "motion",
         "motion_id": _stitch_id(selected["motion_id"]),
         "range": _validate_range(selected.get("range", {})),
     }
@@ -270,20 +268,12 @@ def _validate_motion_step(value: object, *, arriving: bool) -> MotionStep:
         if not arriving:
             raise ValueError("Placement is supported only on the arriving motion")
         result["placement"] = _validate_placement(selected["placement"])
+    if arriving:
+        if "transition" in selected and selected["transition"] is not None:
+            _validate_transition(selected["transition"], outgoing=False)
+    else:
+        result["transition"] = _validate_transition(selected.get("transition", {}), outgoing=True)
     return result
-
-
-def _validate_transition_step(value: object) -> TransitionStep:
-    selected = _allowed_fields(value, required={"type"}, allowed={"type", "duration_seconds"})
-    if selected["type"] != "transition":
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
-    duration = float(_finite(selected.get("duration_seconds", DEFAULT_TRANSITION_SECONDS)))
-    if not MIN_TRANSITION_SECONDS <= duration <= MAX_TRANSITION_SECONDS:
-        raise ValueError("Transition duration must be 0.1-3 seconds")
-    return {"type": "transition", "duration_seconds": duration}
 
 
 def validate_stitch_input(value: object) -> StitchInput:
@@ -292,16 +282,12 @@ def validate_stitch_input(value: object) -> StitchInput:
         value, required={"character_id", "steps"}, allowed={"character_id", "steps"}
     )
     character_id = _stitch_id(request["character_id"])
-    if not isinstance(steps := request["steps"], list) or len(steps) != 3:
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
+    if not isinstance(steps := request["steps"], list) or len(steps) != 2:
+        raise ValueError("Must include exactly two motion objects")
     return {
         "character_id": character_id,
         "steps": [
             _validate_motion_step(steps[0], arriving=False),
-            _validate_transition_step(steps[1]),
-            _validate_motion_step(steps[2], arriving=True),
+            _validate_motion_step(steps[1], arriving=True),
         ],
     }

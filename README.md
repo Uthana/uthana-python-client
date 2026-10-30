@@ -268,9 +268,8 @@ Join two motions with automatic positioning. The server handles sampling and ali
 result = await uthana_client.motions.stitch({
     "character_id": character_id,
     "steps": [
-        {"type": "motion", "motion_id": first_motion_id},
-        {"type": "transition", "duration_seconds": 1.0},
-        {"type": "motion", "motion_id": second_motion_id},
+        {"motion_id": first_motion_id},
+        {"motion_id": second_motion_id},
     ],
 })
 print(result["motion"]["id"], result["resolved_steps"])
@@ -285,13 +284,11 @@ result = await uthana_client.motions.stitch({
     "character_id": character_id,
     "steps": [
         {
-            "type": "motion",
             "motion_id": first_motion_id,
             "range": {"start_frame": 12, "end_frame": 60},
+            "transition": {"duration_seconds": 1.5},
         },
-        {"type": "transition", "duration_seconds": 1.5},
         {
-            "type": "motion",
             "motion_id": second_motion_id,
             "range": {"start_seconds": 0.5, "end_seconds": 3.0},
             "placement": {"forward_m": 1.0, "right_m": 0.5, "turn_degrees": 45.0},

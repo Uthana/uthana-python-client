@@ -11,7 +11,7 @@ from .stitch import (
     StitchPlacement,
     StitchRange,
     StitchResult,
-    TransitionStep,
+    StitchTransition,
 )
 from .types import (
     Character,
@@ -48,7 +48,7 @@ __all__ = [
     "StitchParams",
     "StitchInput",
     "MotionStep",
-    "TransitionStep",
+    "StitchTransition",
     "StitchRange",
     "StitchResult",
     "StitchPlacement",
