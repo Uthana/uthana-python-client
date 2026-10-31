@@ -156,17 +156,15 @@ async def test_robot_download_uses_csv_route_and_long_timeout() -> None:
 
     def handler(request):
         requests.append(request)
-        return httpx.Response(200, content=b"Frame,root_x
-0,0.0
-")
+        return httpx.Response(200, content=b"Frame,root_x\n0,0.0\n")
 
     client = client_for(handler)
     data = await client.motions.download_robot("char1", "motion1", fps=60, max_bytes=100)
-    assert data == b"Frame,root_x
-0,0.0
-"
+    assert data == b"Frame,root_x\n0,0.0\n"
     assert requests[0].method == "GET"
-    assert requests[0].url.path == "/motion/file/motion_viewer/char1/motion1/csv/unitree_g1_char1-motion1.csv"
+    assert requests[0].url.path == (
+        "/motion/file/motion_viewer/char1/motion1/csv/unitree_g1_char1-motion1.csv"
+    )
     assert dict(requests[0].url.params) == {"fps": "60"}
     assert requests[0].extensions["timeout"]["read"] == 660.0
     assert requests[0].extensions["timeout"]["connect"] == 15.0
