@@ -29,6 +29,7 @@ integrations share one implementation.
 - `motions.download(...)` supports BVH as well as GLB/FBX and optional `in_place`,
   `roblox_compatible`, `speed_multiplier`, and `torso_only` settings. These affect
   exports only. Roblox requires a compatible target rig; BVH cannot include mesh.
+- `motions.download_robot(character_id, motion_id, robot="unitree_g1", fps=30)` returns the motion as Unitree G1 CSV joint trajectories. The character ID selects access and download billing only; the output is always for the robot. The GPU retarget can take minutes, so the default read timeout is 660 seconds.
 - `motions.preview(..., format="apng")` returns the existing APNG preview.
   `motions.download_allowed(...)` checks eligibility without creating a download.
 - `characters.metadata(id)` exposes rig metadata. Character and video
@@ -468,6 +469,11 @@ async def manage_motions():
         fps=30,
         no_mesh=False,
     )
+
+    # Download the same motion as Unitree G1 robot CSV (billed like any other download)
+    g1_csv = await uthana_client.motions.download_robot(UthanaCharacters.tar, "motion-id", fps=30)
+    with open("unitree_g1_motion.csv", "wb") as f:
+        f.write(g1_csv)
 
     # Download motion preview WebM (does not charge download seconds)
     preview_bytes = await uthana_client.motions.preview(character_id, motion_id)
