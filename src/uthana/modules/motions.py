@@ -23,11 +23,16 @@ from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
     OutputFormat,
+    RobotFormat,
     TextToMotionResult,
     UthanaCharacters,
     UthanaError,
 )
 from ._base import _BaseModule
+
+# The backend waits up to 600 seconds for the GPU robot retarget job before it responds.
+ROBOT_DOWNLOAD_TIMEOUT = httpx.Timeout(660.0, connect=15.0)
+ROBOT_DOWNLOAD_FPS = (24, 30, 60)
 
 
 class MotionsModule(_BaseModule):
@@ -388,6 +393,60 @@ class MotionsModule(_BaseModule):
                 speed_multiplier=speed_multiplier,
                 torso_only=torso_only,
                 max_bytes=max_bytes,
+            )
+        )
+
+    async def download_robot(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        robot: RobotFormat = "unitree_g1",
+        fps: int | None = None,
+        max_bytes: int | None = None,
+        timeout: float | httpx.Timeout = ROBOT_DOWNLOAD_TIMEOUT,
+    ) -> bytes:
+        """Download a motion retargeted to a robot as CSV joint trajectories.
+
+        ``unitree_g1`` is the only supported robot. The character ID selects access and
+        download billing only; the output is always for the robot. ``fps`` is 24, 30, or 60
+        and the backend uses 30 when omitted. The robot retarget runs on a GPU, so the
+        default HTTP read timeout allows 660 seconds.
+        """
+        if robot != "unitree_g1":
+            raise ValueError("Robot must be unitree_g1")
+        has_supported_fps = fps is None or (type(fps) is int and fps in ROBOT_DOWNLOAD_FPS)
+        if not has_supported_fps:
+            raise ValueError("Robot download fps must be 24, 30, or 60")
+        character = quote(character_id, safe="")
+        motion = quote(motion_id, safe="")
+        url = (
+            f"{self._client.base_url}/motion/file/motion_viewer/{character}/{motion}/csv/"
+            f"{robot}_{character}-{motion}.csv"
+        )
+        if fps is not None:
+            url += f"?fps={fps}"
+        return await self._client._request_bytes("GET", url, max_bytes=max_bytes, timeout=timeout)
+
+    def download_robot_sync(
+        self,
+        character_id: str,
+        motion_id: str,
+        *,
+        robot: RobotFormat = "unitree_g1",
+        fps: int | None = None,
+        max_bytes: int | None = None,
+        timeout: float | httpx.Timeout = ROBOT_DOWNLOAD_TIMEOUT,
+    ) -> bytes:
+        """Download a motion retargeted to a robot as CSV joint trajectories (sync)."""
+        return asyncio.run(
+            self.download_robot(
+                character_id,
+                motion_id,
+                robot=robot,
+                fps=fps,
+                max_bytes=max_bytes,
+                timeout=timeout,
             )
         )
 

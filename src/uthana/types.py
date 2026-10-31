@@ -162,6 +162,7 @@ ModelType = Literal["auto"] | TtmModelType | TtmJobModelType | VtmModelType
 OutputFormat = Literal["glb", "fbx", "bvh"]
 
 DEFAULT_OUTPUT_FORMAT: OutputFormat = "glb"
+RobotFormat = Literal["unitree_g1"]
 DEFAULT_TIMEOUT = 120.0
 SUPPORTED_VIDEO_FORMATS = frozenset({".mp4", ".mov", ".avi"})
 
