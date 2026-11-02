@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from uthana import Uthana, UthanaCharacters
+from uthana import TtmVariant, Uthana, UthanaCharacters
 from uthana.types import (
     CharacterPreviewResult,
     CreateFromGeneratedImageResult,
@@ -518,10 +518,10 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("variant", [None, "regular", "fast", "fast-mini"])
+@pytest.mark.parametrize("variant", [None, "regular", "light", "mini"])
 @pytest.mark.parametrize("is_fast", [False, True])
 async def test_ttm_variant_and_speed_hint_are_independent(
-    variant: str | None, is_fast: bool
+    variant: TtmVariant | None, is_fast: bool
 ) -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"id": "j3", "status": "QUEUED"})
@@ -536,6 +536,6 @@ async def test_ttm_variant_and_speed_hint_are_independent(
 def test_ttm_sync_variant_is_forwarded() -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"id": "j4", "status": "QUEUED"})
-    job = client.ttm.create_job_sync("wave", model="text-to-motion-3.0", variant="fast-mini")
+    job = client.ttm.create_job_sync("wave", model="text-to-motion-3.0", variant="mini")
     assert job["id"] == "j4"
-    assert client._graphql.call_args.args[1]["variant"] == "fast-mini"
+    assert client._graphql.call_args.args[1]["variant"] == "mini"
