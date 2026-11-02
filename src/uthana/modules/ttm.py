@@ -9,7 +9,14 @@ from typing import cast
 
 from ..graphql import q
 from ..models import models
-from ..types import Job, TextToMotionResult, TtmJobModelType, TtmModelType, UthanaCharacters
+from ..types import (
+    Job,
+    TextToMotionResult,
+    TtmJobModelType,
+    TtmModelType,
+    TtmVariant,
+    UthanaCharacters,
+)
 from ..utils import normalize_model_name
 from ._base import _BaseModule
 
@@ -85,11 +92,13 @@ class TtmModule(_BaseModule):
         length: float | None = None,
         rewrite_prompt: bool | None = None,
         fast: bool = False,
+        variant: TtmVariant | None = None,
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
 
-        ``fast=True`` uses the faster TTM 3.0 variant.
-        ``fast=False`` (default) uses standard TTM 3.0.
+        ``variant`` selects regular (default), fast, or fast-mini.
+        ``fast`` is an independent hint with no current scheduling effect.
+        Migrate old ``fast=True`` selections to ``variant="fast"``.
 
         Available to any account on the pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
         """
@@ -100,6 +109,7 @@ class TtmModule(_BaseModule):
             "length": length,
             "rewrite_prompt": rewrite_prompt,
             "fast": fast,
+            "variant": "regular" if variant is None else variant,
         }
         data = await self._client._graphql(
             q.CREATE_TEXT_TO_MOTION_JOB, variables, path="create_text_to_motion_job.job"
@@ -115,6 +125,7 @@ class TtmModule(_BaseModule):
         length: float | None = None,
         rewrite_prompt: bool | None = None,
         fast: bool = False,
+        variant: TtmVariant | None = None,
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0), blocking.
 
@@ -129,5 +140,6 @@ class TtmModule(_BaseModule):
                 length=length,
                 rewrite_prompt=rewrite_prompt,
                 fast=fast,
+                variant=variant,
             )
         )

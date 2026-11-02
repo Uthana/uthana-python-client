@@ -178,7 +178,7 @@ async def ttm_async_job():
         model="text-to-motion-3.0",
         length=8,            # optional, 4–10 seconds
         rewrite_prompt=True, # optional, default True
-        fast=True,           # optional; omit or False for standard TTM 3.0
+        variant="fast",      # optional: "regular" (default), "fast", or "fast-mini"
         character_id=UthanaCharacters.tar,  # optional
     )
 
@@ -195,6 +195,8 @@ asyncio.run(ttm_async_job())
 ```
 
 Sync variant: `uthana_client.ttm.create_job_sync(...)`.
+
+`variant` selects the TTM 3.0 offering. `fast` is an independent hint with no current scheduling effect. To retain Fast mode when migrating an older `fast=True` request, pass `variant="fast"`. Fast Mini uses `variant="fast-mini"` and accepts 5–10 seconds (default 5). Regular/Fast accept 4–10 seconds (default 4). This client requires the API with `variant` support; older servers reject the new GraphQL argument.
 
 ## Locomotion
 
