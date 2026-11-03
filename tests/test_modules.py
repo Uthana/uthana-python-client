@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from uthana import TtmVariant, Uthana, UthanaCharacters
+from uthana import TtmJobModelType, Uthana, UthanaCharacters
 from uthana.types import (
     CharacterPreviewResult,
     CreateFromGeneratedImageResult,
@@ -479,7 +479,7 @@ async def test_jobs_get_normalizes_timestamps() -> None:
 
 
 # ---------------------------------------------------------------------------
-# ttm.create_job — variant selection and independent speed hint
+# ttm.create_job — model selection and independent speed hint
 # ---------------------------------------------------------------------------
 
 
@@ -518,24 +518,27 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("variant", [None, "regular", "light", "mini"])
+@pytest.mark.parametrize(
+    "model", ["text-to-motion-3.0", "text-to-motion-3.0-lite", "text-to-motion-3.0-mini"]
+)
 @pytest.mark.parametrize("is_fast", [False, True])
-async def test_ttm_variant_and_speed_hint_are_independent(
-    variant: TtmVariant | None, is_fast: bool
+async def test_ttm_model_and_speed_hint_are_independent(
+    model: TtmJobModelType, is_fast: bool
 ) -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"id": "j3", "status": "QUEUED"})
-    await client.ttm.create_job("wave", model="text-to-motion-3.0", variant=variant, fast=is_fast)
+    await client.ttm.create_job("wave", model=model, fast=is_fast)
     query, variables = client._graphql.call_args.args
-    assert "$variant: String" in query
-    assert "variant: $variant" in query
-    assert variables["variant"] == ("regular" if variant is None else variant)
+    assert "$variant" not in query
+    assert "variant" not in variables
+    assert variables["model"] == model
     assert variables["fast"] is is_fast
 
 
-def test_ttm_sync_variant_is_forwarded() -> None:
+def test_ttm_sync_model_is_forwarded() -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"id": "j4", "status": "QUEUED"})
-    job = client.ttm.create_job_sync("wave", model="text-to-motion-3.0", variant="mini")
+    job = client.ttm.create_job_sync("wave", model="text-to-motion-3.0-mini")
     assert job["id"] == "j4"
-    assert client._graphql.call_args.args[1]["variant"] == "mini"
+    assert client._graphql.call_args.args[1]["model"] == "text-to-motion-3.0-mini"
+    assert "variant" not in client._graphql.call_args.args[1]
