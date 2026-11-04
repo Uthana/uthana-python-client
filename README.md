@@ -178,6 +178,7 @@ async def ttm_async_job():
         model="text-to-motion-3.0",
         length=8,            # optional, 4–10 seconds
         rewrite_prompt=True, # optional, default True
+        fast=True,           # optional; omit or False for standard TTM 3.0
         character_id=UthanaCharacters.tar,  # optional
     )
 
@@ -194,8 +195,6 @@ asyncio.run(ttm_async_job())
 ```
 
 Sync variant: `uthana_client.ttm.create_job_sync(...)`.
-
-Use `model="text-to-motion-3.0"` for Regular, `"text-to-motion-3.0-lite"` for Lite, or `"text-to-motion-3.0-mini"` for Mini. There is no separate variant argument. `fast` remains an independent hint with no current scheduling effect. Regular accepts 4–10 seconds (default 4); Lite and Mini accept 5–10 seconds (default 5). Regular/Lite cost $0.10 per output second; Mini costs $0.075. New Lite/Mini model values require the updated server; existing Regular requests keep the same mutation shape.
 
 ## Locomotion
 

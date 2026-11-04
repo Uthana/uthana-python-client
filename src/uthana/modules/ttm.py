@@ -9,13 +9,7 @@ from typing import cast
 
 from ..graphql import q
 from ..models import models
-from ..types import (
-    Job,
-    TextToMotionResult,
-    TtmJobModelType,
-    TtmModelType,
-    UthanaCharacters,
-)
+from ..types import Job, TextToMotionResult, TtmJobModelType, TtmModelType, UthanaCharacters
 from ..utils import normalize_model_name
 from ._base import _BaseModule
 
@@ -94,9 +88,8 @@ class TtmModule(_BaseModule):
     ) -> Job:
         """Submit an async text-to-motion job (TTM 3.0). Returns a Job to poll via jobs.get().
 
-        ``model`` selects Regular, Lite (-lite), or Mini (-mini).
-        ``fast`` is an independent hint with no current scheduling effect.
-        Select Lite with ``model="text-to-motion-3.0-lite"``.
+        ``fast=True`` uses the faster TTM 3.0 variant.
+        ``fast=False`` (default) uses standard TTM 3.0.
 
         Available to any account on the pay-as-you-go plan. See https://uthana.com/docs/api/pricing.
         """
