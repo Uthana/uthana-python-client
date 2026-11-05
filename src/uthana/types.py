@@ -60,6 +60,32 @@ class Org(TypedDict, total=False):
     motion_download_secs_per_month_remaining: float | None
 
 
+class LedgerEntry(TypedDict, total=False):
+    """One PAYG ledger row from org.get_ledger. USD amounts are decimal strings.
+
+    ``type`` is ``debit`` (a charge; ``status`` ``failed`` marks a $0 failed
+    generation), ``topup`` (a card payment), ``credit_grant`` (free credit) or
+    ``adjustment`` (a signed staff correction). ``total_usd`` is unsigned for
+    debits, top-ups and grants; read the direction from ``type``.
+    """
+
+    id: str
+    created: str
+    type: str
+    total_usd: str
+    balance_before: str
+    balance_after: str
+    job_id: str | None
+    task_id: str | None
+    model: str | None
+    model_version: str | None
+    billing_unit: str | None
+    quantity: float | None
+    unit_price: str | None
+    ref: str | None
+    status: str | None
+
+
 class Character(TypedDict, total=False):
     """Character object from characters.list."""
 
