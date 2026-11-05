@@ -111,6 +111,20 @@ class TextToMotionResult:
 
 
 @dataclass
+class LibrarySearchResult:
+    """Result of ttm.library_search: the best library match, copied into your organization.
+
+    ``match_score`` is the cosine similarity between the prompt and the matched clip's
+    description (higher is closer, 1.0 is identical), or None when the API does not report it.
+    """
+
+    character_id: str
+    motion_id: str
+    name: str
+    match_score: float | None
+
+
+@dataclass
 class CreateCharacterResult:
     """Result of characters.create_from_file."""
 

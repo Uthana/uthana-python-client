@@ -6,6 +6,25 @@
 class _GraphQL:
     """Namespace for GraphQL query and mutation strings. Use: from uthana.graphql import q."""
 
+    LIBRARY_SEARCH = """
+mutation LibrarySearch(
+    $prompt: String!,
+    $character_id: String
+) {
+    create_text_to_motion(
+        prompt: $prompt,
+        character_id: $character_id,
+        model: "nearest-neighbor"
+    ) {
+        motion {
+            id
+            name
+            tags
+        }
+    }
+}
+"""
+
     TEXT_TO_MOTION_VQVAE_V1 = """
 mutation TextToMotion(
     $prompt: String!,
