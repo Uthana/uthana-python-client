@@ -12,6 +12,7 @@ from uthana import Uthana, UthanaCharacters
 from uthana.types import (
     CharacterPreviewResult,
     CreateFromGeneratedImageResult,
+    UthanaError,
 )
 
 # ---------------------------------------------------------------------------
@@ -589,3 +590,21 @@ async def test_motion_delete_reads_nested_motion_payload() -> None:
 
     assert motion == record
     assert seen[0]["variables"] == {"motion_id": "m1", "deleted": True}
+
+
+@pytest.mark.asyncio
+async def test_character_get_returns_owner_and_missing_is_404() -> None:
+    record = {"id": "c1", "name": "Knight", "org_id": "o1", "deleted": None}
+    responses = [{"character": record}, {"character": None}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["variables"] == {"character_id": "c1"}
+        return httpx.Response(200, json={"data": responses.pop(0)})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    assert await client.characters.get("c1") == record
+    with pytest.raises(UthanaError) as error:
+        await client.characters.get("c1")
+    client.close()
+
+    assert error.value.status_code == 404

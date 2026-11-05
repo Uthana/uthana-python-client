@@ -272,6 +272,19 @@ mutation CreateCharacterFromImage(
 }
 """
 
+    GET_CHARACTER = """
+query GetCharacter($character_id: String!) {
+    character(id: $character_id) {
+        id
+        name
+        org_id
+        created
+        updated
+        deleted
+    }
+}
+"""
+
     UPDATE_CHARACTER = """
 mutation UpdateCharacter($character_id: String!, $name: String, $deleted: Boolean) {
     update_character(character_id: $character_id, name: $name, deleted: $deleted) {
@@ -366,6 +379,7 @@ query GetMotion($motion_id: String!) {
     motion(id: $motion_id) {
         id
         name
+        org_id
         assets { id uid type sha256 metadata }
     }
 }

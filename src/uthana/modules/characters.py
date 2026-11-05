@@ -448,6 +448,26 @@ class CharactersModule(_BaseModule):
         """List all characters for the authenticated user (sync)."""
         return asyncio.run(self.list())
 
+    async def get(self, character_id: str) -> Character:
+        """Get one live character by ID, including its owning ``org_id``.
+
+        Raises a 404 ``UthanaError`` when no live character is returned. Deleted characters and
+        characters outside the caller's access are not readable.
+        """
+        character = await self._client._graphql(
+            q.GET_CHARACTER,
+            {"character_id": character_id},
+            path="character",
+            return_type=Character,
+        )
+        if not character:
+            raise UthanaError(404, f"No character found matching {character_id}", kind="http")
+        return character
+
+    def get_sync(self, character_id: str) -> Character:
+        """Get one live character by ID (sync)."""
+        return asyncio.run(self.get(character_id))
+
     async def download(
         self,
         character_id: str,

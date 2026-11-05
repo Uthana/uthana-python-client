@@ -394,7 +394,9 @@ async def manage_characters():
     # Image-to-character: upload an image file (always one-shot)
     result = await uthana_client.characters.create_from_image("path/to/reference.png")
 
-    # Rename, soft-delete, or restore (motions are kept when a character is deleted)
+    # Read one character (includes the owning org_id), then rename, soft-delete, or restore it.
+    # Motions are kept when a character is deleted.
+    character = await uthana_client.characters.get(result.character["id"])
     await uthana_client.characters.rename(result.character["id"], "New name")
     deleted = await uthana_client.characters.delete(result.character["id"])
     print(deleted["deleted"])  # deletion timestamp
