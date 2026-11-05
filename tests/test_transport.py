@@ -441,3 +441,38 @@ async def test_query_bound_still_applies_with_separate_mutation_limit(query):
         assert error.value.kind == "response_too_large"
     finally:
         client.close()
+
+
+@pytest.mark.parametrize("multipart", [False, True])
+async def test_trial_job_limit_preserves_429_envelope_without_replaying(multipart):
+    requests = []
+    envelope = {
+        "data": None,
+        "errors": [
+            {
+                "type": "JobLimitExceeded",
+                "code": "job_limit_exceeded",
+                "message": "Wait for your queued or running jobs to complete.",
+                "path": ["create_video_to_motion"],
+            }
+        ],
+    }
+
+    def handle(request):
+        requests.append(request)
+        return httpx.Response(429, json=envelope)
+
+    client = make_client(handle)
+    try:
+        with pytest.raises(UthanaError) as error:
+            await client._graphql(
+                "mutation Upload($file:Upload!){create_video_to_motion(file:$file){job{id}}}",
+                {"file": None} if multipart else {},
+                upload=("input.mp4", b"video") if multipart else None,
+            )
+        assert error.value.status_code == 429
+        assert error.value.response_data == envelope
+        assert error.value.kind == "http"
+        assert len(requests) == 1
+    finally:
+        client.close()
