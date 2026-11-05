@@ -160,6 +160,17 @@ asyncio.run(text_to_motion())
 
 **Available models:** `text-to-motion-1.0` (default), `text-to-motion-2.0`.
 
+### Library search (ttm.library_search)
+
+Find the existing Uthana library motion that best matches a prompt instead of generating a new one. The search covers Uthana's shared motion library and your organization's labeled motions, picks the single closest clip by meaning, and copies it into your organization as a new motion you can preview, retarget and download like any other.
+
+```python
+result = await uthana_client.ttm.library_search("a person stepping back to block", character_id=UthanaCharacters.manny)
+print(result.motion_id, result.name, result.match_score)  # match_score: 1.0 = identical description
+```
+
+Library search is a charged operation (`library-search-1.0`, billed per second of the returned clip; see [pricing](https://uthana.com/docs/api/pricing)), charged even when the match is weak. It returns one motion, not a list of candidates, and an unrelated result does not prove the library lacks a better clip. Sync variant: `uthana_client.ttm.library_search_sync(...)`.
+
 ## Text to motion 3.0 async job (ttm.create_job)
 
 `text-to-motion-3.0` runs as an async job and returns a job dict to poll — the same pattern as video-to-motion. Available to any account on the [pay-as-you-go plan](https://uthana.com/docs/api/pricing).

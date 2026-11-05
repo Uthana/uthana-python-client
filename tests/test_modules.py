@@ -515,3 +515,59 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
     call_vars = client._graphql.call_args[0][1]
     assert call_vars["fast"] is False
+
+
+# ---------------------------------------------------------------------------
+# ttm.library_search
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_sends_nearest_neighbor_and_parses_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={
+            "motion": {
+                "id": "mLib1",
+                "name": "NN: a person waving",
+                "tags": {"Method": "NearestNeighborRaw", "Nearest": "lX", "Distance": 0.8123},
+            }
+        }
+    )
+
+    result = await client.ttm.library_search("a person waving", character_id="cAva")
+
+    call_query, call_vars = client._graphql.call_args[0][0], client._graphql.call_args[0][1]
+    assert 'model: "nearest-neighbor"' in call_query
+    assert call_vars == {"prompt": "a person waving", "character_id": "cAva"}
+    assert client._graphql.call_args.kwargs["path"] == "create_text_to_motion"
+    assert result.motion_id == "mLib1"
+    assert result.character_id == "cAva"
+    assert result.name == "NN: a person waving"
+    assert result.match_score == pytest.approx(0.8123)
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_defaults_to_tar_and_tolerates_missing_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={"motion": {"id": "mLib2", "name": "NN: jump", "tags": {}}}
+    )
+
+    result = await client.ttm.library_search("jump")
+
+    assert client._graphql.call_args[0][1]["character_id"] is None
+    assert result.character_id == UthanaCharacters.tar
+    assert result.match_score is None
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_ignores_non_numeric_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={"motion": {"id": "mLib3", "name": "NN: x", "tags": {"Distance": True}}}
+    )
+
+    result = await client.ttm.library_search("x")
+
+    assert result.match_score is None
