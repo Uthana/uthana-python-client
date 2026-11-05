@@ -52,7 +52,7 @@ def test_nonfinite_values(value):
     options = {
         **OPTIONS,
         "steps": [
-            {**OPTIONS["steps"][0], "transition": {"duration_seconds": value}},
+            {**OPTIONS["steps"][0], "transition_duration_seconds": value},
             OPTIONS["steps"][1],
         ],
     }
@@ -87,13 +87,10 @@ async def test_invalid_result_is_specific_and_uncertain_without_retry(result, me
 
 def test_normalization_preserves_caller_owned_nested_records():
     request = deepcopy(FIXTURES["valid"][1]["input"])
-    request["steps"][1]["placement"] = {"forward_m": 0, "right_m": 0.5}
+    request["steps"][0]["transition_right_meters"] = 0.5
     original = deepcopy(request)
     normalized = validate_stitch_input(request)
     assert validate_stitch_input(normalized) == normalized
-    first, last = normalized["steps"]
-    assert "type" not in first and "type" not in last
-    assert "range" in first and "placement" in last
-    first["range"]["end_frame"] = 50
-    last["placement"]["right_m"] = 10
+    normalized["steps"][0]["trim_end_frame"] = 50
+    normalized["steps"][0]["transition_right_meters"] = 10
     assert request == original

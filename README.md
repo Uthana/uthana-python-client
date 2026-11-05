@@ -285,13 +285,13 @@ result = await uthana_client.motions.stitch({
     "steps": [
         {
             "motion_id": first_motion_id,
-            "range": {"start_frame": 12, "end_frame": 60},
-            "transition": {"duration_seconds": 1.5},
+            "trim_start_frame": 12, "trim_end_frame": 60,
+            "transition_duration_seconds": 1.5,
+            "transition_forward_meters": 1.0, "transition_right_meters": 0.5, "transition_facing_degrees": 45.0,
         },
         {
             "motion_id": second_motion_id,
-            "range": {"start_seconds": 0.5, "end_seconds": 3.0},
-            "placement": {"forward_m": 1.0, "right_m": 0.5, "turn_degrees": 45.0},
+            "trim_start_seconds": 0.5, "trim_end_seconds": 3.0,
         },
     ],
 })

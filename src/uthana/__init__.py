@@ -8,10 +8,7 @@ from .stitch import (
     MotionStep,
     StitchInput,
     StitchParams,
-    StitchPlacement,
-    StitchRange,
     StitchResult,
-    StitchTransition,
 )
 from .types import (
     Character,
@@ -48,10 +45,7 @@ __all__ = [
     "StitchParams",
     "StitchInput",
     "MotionStep",
-    "StitchTransition",
-    "StitchRange",
     "StitchResult",
-    "StitchPlacement",
     "TextToMotionResult",
     "TtmJobModelType",
     "TtmModelType",

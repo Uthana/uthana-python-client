@@ -107,10 +107,10 @@ class MotionsModule(_BaseModule):
         *,
         timeout: float | httpx.Timeout | None = 360,
     ) -> StitchResult:
-        """Stitch motion/transition/motion steps with server sampling and alignment.
+        """Stitch two flat motion steps with server sampling and alignment.
 
         Ranges use native frames or seconds. Omitted placement continues travel;
-        explicit placement uses relative meters and rightward degrees. No retries.
+        outgoing placement fields use relative meters and rightward degrees. No retries.
         Requires server support for stitch(input: StitchInput!).
         """
         result = await self._client._graphql(
