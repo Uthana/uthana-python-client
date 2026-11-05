@@ -35,3 +35,7 @@ uv build --clear
 Keep tests offline and deterministic. Live tests must be explicitly configured; do not make paid calls as routine verification. There is no configured coverage-percentage gate to invent or lower. For documentation-only changes, validate examples, links, and formatting; executable changes require relevant regression tests and the normal checks.
 
 Review the full PR diff for style, bugs, security, unnecessary abstractions, and compatibility. Report the checks actually run and distinguish manual review from automated tooling. Keep detailed feature documentation under `docs/`, use simple then advanced examples, and keep each guide self-contained. Never merge or publish without authorization.
+
+## Review tooling
+
+Hosted Cursor/Bugbot reviews are not enabled for this repository. Do not post `@cursor review`, `bugbot run`, or other trigger comments, including as a probe. Use local bug and security reviews of the complete diff against the PR base, fix actionable findings, and repeat affected checks after the final fix. Report local review accurately; do not describe it as a hosted Bugbot pass. Check this policy separately for each repository before batching review requests: a generic request for final reviews or coverage in another repository does not override this rule. Do not enable hosted review as a prerequisite for completing a PR.
