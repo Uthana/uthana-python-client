@@ -494,37 +494,55 @@ class CharactersModule(_BaseModule):
             self.download(character_id, output_format=output_format, max_bytes=max_bytes)
         )
 
-    async def rename(self, character_id: str, name: str) -> Character:
-        """Rename a character by ID. Returns the updated record."""
-        return await self._update(character_id, {"name": name})
+    async def rename(
+        self, character_id: str, name: str, *, own_org_only: bool = False
+    ) -> Character:
+        """Rename a character by ID. Returns the updated record.
 
-    def rename_sync(self, character_id: str, name: str) -> Character:
+        With ``own_org_only=True`` the backend changes the character only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
+        """
+        return await self._update(character_id, {"name": name}, own_org_only=own_org_only)
+
+    def rename_sync(self, character_id: str, name: str, *, own_org_only: bool = False) -> Character:
         """Rename a character by ID (sync)."""
-        return asyncio.run(self.rename(character_id, name))
+        return asyncio.run(self.rename(character_id, name, own_org_only=own_org_only))
 
-    async def delete(self, character_id: str) -> Character:
+    async def delete(self, character_id: str, *, own_org_only: bool = False) -> Character:
         """Soft-delete a character by ID. Returns the record with ``deleted`` set.
 
         Motions do not belong to a character and are kept. Use ``restore`` to undo.
+        With ``own_org_only=True`` the backend changes the character only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
         """
-        return await self._update(character_id, {"deleted": True})
+        return await self._update(character_id, {"deleted": True}, own_org_only=own_org_only)
 
-    def delete_sync(self, character_id: str) -> Character:
+    def delete_sync(self, character_id: str, *, own_org_only: bool = False) -> Character:
         """Soft-delete a character by ID (sync)."""
-        return asyncio.run(self.delete(character_id))
+        return asyncio.run(self.delete(character_id, own_org_only=own_org_only))
 
-    async def restore(self, character_id: str) -> Character:
-        """Restore a soft-deleted character by ID. Returns the record with ``deleted`` cleared."""
-        return await self._update(character_id, {"deleted": False})
+    async def restore(self, character_id: str, *, own_org_only: bool = False) -> Character:
+        """Restore a soft-deleted character by ID. Returns the record with ``deleted`` cleared.
 
-    def restore_sync(self, character_id: str) -> Character:
+        With ``own_org_only=True`` the backend changes the character only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
+        """
+        return await self._update(character_id, {"deleted": False}, own_org_only=own_org_only)
+
+    def restore_sync(self, character_id: str, *, own_org_only: bool = False) -> Character:
         """Restore a soft-deleted character by ID (sync)."""
-        return asyncio.run(self.restore(character_id))
+        return asyncio.run(self.restore(character_id, own_org_only=own_org_only))
 
-    async def _update(self, character_id: str, changes: dict[str, object]) -> Character:
+    async def _update(
+        self, character_id: str, changes: dict[str, object], *, own_org_only: bool
+    ) -> Character:
         """Send only the changed fields; an explicit null would clear the backend value."""
+        if own_org_only:
+            query, changes = q.UPDATE_CHARACTER_OWN_ORG, {**changes, "own_org_only": True}
+        else:
+            query = q.UPDATE_CHARACTER
         return await self._client._graphql(
-            q.UPDATE_CHARACTER,
+            query,
             {"character_id": character_id, **changes},
             path="update_character.character",
             return_type=Character,

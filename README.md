@@ -401,6 +401,9 @@ async def manage_characters():
     deleted = await uthana_client.characters.delete(result.character["id"])
     print(deleted["deleted"])  # deletion timestamp
     await uthana_client.characters.restore(result.character["id"])
+    # own_org_only=True refuses (and changes nothing) unless your organization owns the asset,
+    # even for admin accounts. rename and delete accept it too, for characters and motions.
+    await uthana_client.characters.restore(result.character["id"], own_org_only=True)
 
 
 asyncio.run(manage_characters())

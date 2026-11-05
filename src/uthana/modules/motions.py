@@ -429,37 +429,53 @@ class MotionsModule(_BaseModule):
             )
         )
 
-    async def delete(self, motion_id: str) -> Motion:
+    async def delete(self, motion_id: str, *, own_org_only: bool = False) -> Motion:
         """Soft-delete a motion by ID. Returns the record with ``deleted`` set.
 
         Use ``restore`` to undo.
+        With ``own_org_only=True`` the backend changes the motion only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
         """
-        return await self._update(motion_id, {"deleted": True})
+        return await self._update(motion_id, {"deleted": True}, own_org_only=own_org_only)
 
-    def delete_sync(self, motion_id: str) -> Motion:
+    def delete_sync(self, motion_id: str, *, own_org_only: bool = False) -> Motion:
         """Soft-delete a motion by ID (sync)."""
-        return asyncio.run(self.delete(motion_id))
+        return asyncio.run(self.delete(motion_id, own_org_only=own_org_only))
 
-    async def restore(self, motion_id: str) -> Motion:
-        """Restore a soft-deleted motion by ID. Returns the record with ``deleted`` cleared."""
-        return await self._update(motion_id, {"deleted": False})
+    async def restore(self, motion_id: str, *, own_org_only: bool = False) -> Motion:
+        """Restore a soft-deleted motion by ID. Returns the record with ``deleted`` cleared.
 
-    def restore_sync(self, motion_id: str) -> Motion:
+        With ``own_org_only=True`` the backend changes the motion only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
+        """
+        return await self._update(motion_id, {"deleted": False}, own_org_only=own_org_only)
+
+    def restore_sync(self, motion_id: str, *, own_org_only: bool = False) -> Motion:
         """Restore a soft-deleted motion by ID (sync)."""
-        return asyncio.run(self.restore(motion_id))
+        return asyncio.run(self.restore(motion_id, own_org_only=own_org_only))
 
-    async def rename(self, motion_id: str, new_name: str) -> Motion:
-        """Rename a motion by ID. Returns the updated record."""
-        return await self._update(motion_id, {"name": new_name})
+    async def rename(self, motion_id: str, new_name: str, *, own_org_only: bool = False) -> Motion:
+        """Rename a motion by ID. Returns the updated record.
 
-    def rename_sync(self, motion_id: str, new_name: str) -> Motion:
+        With ``own_org_only=True`` the backend changes the motion only if your org owns it,
+        even for admin accounts, and otherwise raises ``UthanaError`` without changing anything.
+        """
+        return await self._update(motion_id, {"name": new_name}, own_org_only=own_org_only)
+
+    def rename_sync(self, motion_id: str, new_name: str, *, own_org_only: bool = False) -> Motion:
         """Rename a motion by ID (sync)."""
-        return asyncio.run(self.rename(motion_id, new_name))
+        return asyncio.run(self.rename(motion_id, new_name, own_org_only=own_org_only))
 
-    async def _update(self, motion_id: str, changes: dict[str, object]) -> Motion:
+    async def _update(
+        self, motion_id: str, changes: dict[str, object], *, own_org_only: bool
+    ) -> Motion:
         """Send only the changed fields; an explicit null would clear the backend value."""
+        if own_org_only:
+            query, changes = q.UPDATE_MOTION_OWN_ORG, {**changes, "own_org_only": True}
+        else:
+            query = q.UPDATE_MOTION
         return await self._client._graphql(
-            q.UPDATE_MOTION,
+            query,
             {"motion_id": motion_id, **changes},
             path="update_motion.motion",
             return_type=Motion,

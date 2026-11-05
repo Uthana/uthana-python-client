@@ -569,6 +569,68 @@ async def test_motion_lifecycle_uses_backend_argument_and_payload(call, expected
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,kind,expected_changes",
+    [
+        (
+            lambda c: c.characters.rename("x1", "Knight", own_org_only=True),
+            "character",
+            {"name": "Knight"},
+        ),
+        (lambda c: c.characters.delete("x1", own_org_only=True), "character", {"deleted": True}),
+        (lambda c: c.characters.restore("x1", own_org_only=True), "character", {"deleted": False}),
+        (lambda c: c.motions.rename("x1", "Wave", own_org_only=True), "motion", {"name": "Wave"}),
+        (lambda c: c.motions.delete("x1", own_org_only=True), "motion", {"deleted": True}),
+        (lambda c: c.motions.restore("x1", own_org_only=True), "motion", {"deleted": False}),
+    ],
+)
+async def test_lifecycle_own_org_only_sends_backend_argument(call, kind, expected_changes) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "own_org_only: $own_org_only" in query
+    assert variables == {f"{kind}_id": "x1", **expected_changes, "own_org_only": True}
+    assert client._graphql.call_args.kwargs["path"] == f"update_{kind}.{kind}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["character", "motion"])
+async def test_lifecycle_default_omits_own_org_only(kind) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
+
+    await getattr(client, f"{kind}s").restore("x1")
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "own_org_only" not in query
+    assert "own_org_only" not in variables
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["character", "motion"])
+async def test_restore_not_owned_raises(kind) -> None:
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        error = {
+            "message": f"{kind} x1 does not belong to your organization.",
+            "type": "UserAccessRequired",
+        }
+        return httpx.Response(200, json={"data": None, "errors": [error]})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    with pytest.raises(UthanaError, match="does not belong to your organization"):
+        await getattr(client, f"{kind}s").restore("x1", own_org_only=True)
+    client.close()
+
+    assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False, "own_org_only": True}
+
+
+@pytest.mark.asyncio
 async def test_motion_delete_reads_nested_motion_payload() -> None:
     seen = []
     record = {
