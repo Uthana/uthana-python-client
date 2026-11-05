@@ -410,6 +410,12 @@ query Usage {
 }
 """
 
+    LEDGER_FIELDS = """
+        id created type total_usd balance_before balance_after
+        job_id task_id model model_version billing_unit quantity unit_price
+        ref status
+"""
+
     GET_PRICES = """
 query Prices {
     payg_prices { model_key billing_unit unit_price }

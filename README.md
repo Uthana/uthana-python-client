@@ -39,6 +39,7 @@ integrations share one implementation.
   for transfer and processing. These phase limits are not an overall deadline.
 - `org.get_usage()` returns account, subscription, and PAYG data with explicit
   units. `org.get_prices()` returns current rates. Neither computes a per-job bill.
+- `org.get_ledger(limit=50, before_id=None, since=None, until=None, types=None)` returns recorded PAYG charges, payments and credits, newest first, with the charged motion or character in `ref` (`motion:<id>` or `character:<id>`) and in `job_id`, which despite its name holds that asset ID; the processing job ID is in `task_id`. Page with the last entry's `id` as `before_id`. Organizations on a legacy monthly plan have no ledger rows.
 
 Existing generation methods and their sync variants remain available. New module
 methods also have `_sync` variants. Optional export switches retain backend defaults
