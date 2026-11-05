@@ -430,30 +430,40 @@ class MotionsModule(_BaseModule):
         )
 
     async def delete(self, motion_id: str) -> Motion:
-        """Soft-delete a motion by ID."""
-        return await self._client._graphql(
-            q.UPDATE_MOTION,
-            {"id": motion_id, "deleted": True},
-            path="update_motion",
-            return_type=Motion,
-        )
+        """Soft-delete a motion by ID. Returns the record with ``deleted`` set.
+
+        Use ``restore`` to undo.
+        """
+        return await self._update(motion_id, {"deleted": True})
 
     def delete_sync(self, motion_id: str) -> Motion:
         """Soft-delete a motion by ID (sync)."""
         return asyncio.run(self.delete(motion_id))
 
+    async def restore(self, motion_id: str) -> Motion:
+        """Restore a soft-deleted motion by ID. Returns the record with ``deleted`` cleared."""
+        return await self._update(motion_id, {"deleted": False})
+
+    def restore_sync(self, motion_id: str) -> Motion:
+        """Restore a soft-deleted motion by ID (sync)."""
+        return asyncio.run(self.restore(motion_id))
+
     async def rename(self, motion_id: str, new_name: str) -> Motion:
-        """Rename a motion by ID."""
-        return await self._client._graphql(
-            q.UPDATE_MOTION,
-            {"id": motion_id, "name": new_name},
-            path="update_motion",
-            return_type=Motion,
-        )
+        """Rename a motion by ID. Returns the updated record."""
+        return await self._update(motion_id, {"name": new_name})
 
     def rename_sync(self, motion_id: str, new_name: str) -> Motion:
         """Rename a motion by ID (sync)."""
         return asyncio.run(self.rename(motion_id, new_name))
+
+    async def _update(self, motion_id: str, changes: dict[str, object]) -> Motion:
+        """Send only the changed fields; an explicit null would clear the backend value."""
+        return await self._client._graphql(
+            q.UPDATE_MOTION,
+            {"motion_id": motion_id, **changes},
+            path="update_motion.motion",
+            return_type=Motion,
+        )
 
     async def favorite(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite."""

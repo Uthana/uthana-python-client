@@ -1,6 +1,6 @@
 # (c) Copyright 2026 Uthana, Inc. All Rights Reserved
 
-"""Character management: upload, list, download, generate previews, rename, and delete."""
+"""Character management: upload, list, download, generate previews, rename, delete, and restore."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from ._base import _BaseModule
 
 
 class CharactersModule(_BaseModule):
-    """Character management: upload, list, download, generate previews, rename, and delete."""
+    """Character management: upload, list, download, previews, rename, delete, and restore."""
 
     async def create_from_file(
         self,
@@ -475,30 +475,40 @@ class CharactersModule(_BaseModule):
         )
 
     async def rename(self, character_id: str, name: str) -> Character:
-        """Rename a character by ID."""
-        return await self._client._graphql(
-            q.RENAME_CHARACTER,
-            {"character_id": character_id, "name": name},
-            path="update_character.character",
-            return_type=Character,
-        )
+        """Rename a character by ID. Returns the updated record."""
+        return await self._update(character_id, {"name": name})
 
     def rename_sync(self, character_id: str, name: str) -> Character:
         """Rename a character by ID (sync)."""
         return asyncio.run(self.rename(character_id, name))
 
     async def delete(self, character_id: str) -> Character:
-        """Soft-delete a character by ID."""
-        return await self._client._graphql(
-            q.DELETE_CHARACTER,
-            {"character_id": character_id},
-            path="update_character.character",
-            return_type=Character,
-        )
+        """Soft-delete a character by ID. Returns the record with ``deleted`` set.
+
+        Motions do not belong to a character and are kept. Use ``restore`` to undo.
+        """
+        return await self._update(character_id, {"deleted": True})
 
     def delete_sync(self, character_id: str) -> Character:
         """Soft-delete a character by ID (sync)."""
         return asyncio.run(self.delete(character_id))
+
+    async def restore(self, character_id: str) -> Character:
+        """Restore a soft-deleted character by ID. Returns the record with ``deleted`` cleared."""
+        return await self._update(character_id, {"deleted": False})
+
+    def restore_sync(self, character_id: str) -> Character:
+        """Restore a soft-deleted character by ID (sync)."""
+        return asyncio.run(self.restore(character_id))
+
+    async def _update(self, character_id: str, changes: dict[str, object]) -> Character:
+        """Send only the changed fields; an explicit null would clear the backend value."""
+        return await self._client._graphql(
+            q.UPDATE_CHARACTER,
+            {"character_id": character_id, **changes},
+            path="update_character.character",
+            return_type=Character,
+        )
 
     # ---------------------------------------------------------------------------
     # Private helpers

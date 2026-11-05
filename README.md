@@ -394,9 +394,11 @@ async def manage_characters():
     # Image-to-character: upload an image file (always one-shot)
     result = await uthana_client.characters.create_from_image("path/to/reference.png")
 
-    # Rename or delete
+    # Rename, soft-delete, or restore (motions are kept when a character is deleted)
     await uthana_client.characters.rename(result.character["id"], "New name")
-    await uthana_client.characters.delete(result.character["id"])
+    deleted = await uthana_client.characters.delete(result.character["id"])
+    print(deleted["deleted"])  # deletion timestamp
+    await uthana_client.characters.restore(result.character["id"])
 
 
 asyncio.run(manage_characters())
@@ -477,8 +479,9 @@ async def manage_motions():
     # Rename a motion
     await uthana_client.motions.rename("motion-id", "New name")
 
-    # Delete a motion (soft delete)
+    # Delete a motion (soft delete), then restore it
     await uthana_client.motions.delete("motion-id")
+    await uthana_client.motions.restore("motion-id")
 
     # Favorite / unfavorite
     await uthana_client.motions.favorite("motion-id", True)

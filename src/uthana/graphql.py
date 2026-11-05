@@ -272,23 +272,16 @@ mutation CreateCharacterFromImage(
 }
 """
 
-    RENAME_CHARACTER = """
-mutation RenameCharacter($character_id: String!, $name: String!) {
-    update_character(character_id: $character_id, name: $name) {
+    UPDATE_CHARACTER = """
+mutation UpdateCharacter($character_id: String!, $name: String, $deleted: Boolean) {
+    update_character(character_id: $character_id, name: $name, deleted: $deleted) {
         character {
             id
             name
-        }
-    }
-}
-"""
-
-    DELETE_CHARACTER = """
-mutation DeleteCharacter($character_id: String!) {
-    update_character(character_id: $character_id, deleted: true) {
-        character {
-            id
-            name
+            org_id
+            created
+            updated
+            deleted
         }
     }
 }
@@ -337,11 +330,16 @@ query LocomotionStyles {
 """
 
     UPDATE_MOTION = """
-mutation update_motion($id: String!, $name: String, $deleted: Boolean) {
-    update_motion(id: $id, name: $name, deleted: $deleted) {
-        id
-        name
-        deleted
+mutation UpdateMotion($motion_id: String!, $name: String, $deleted: Boolean) {
+    update_motion(motion_id: $motion_id, name: $name, deleted: $deleted) {
+        motion {
+            id
+            name
+            org_id
+            created
+            updated
+            deleted
+        }
     }
 }
 """

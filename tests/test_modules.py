@@ -2,8 +2,10 @@
 
 """Unit tests for module methods using mocked _graphql and httpx."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from uthana import Uthana, UthanaCharacters
@@ -515,3 +517,75 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
     call_vars = client._graphql.call_args[0][1]
     assert call_vars["fast"] is False
+
+
+# ---------------------------------------------------------------------------
+# Asset lifecycle: rename / delete / restore send only the changed fields
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.characters.rename("c1", "Knight"), {"character_id": "c1", "name": "Knight"}),
+        (lambda c: c.characters.delete("c1"), {"character_id": "c1", "deleted": True}),
+        (lambda c: c.characters.restore("c1"), {"character_id": "c1", "deleted": False}),
+    ],
+)
+async def test_character_lifecycle_variables(call, expected_variables) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "c1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_character(character_id: $character_id, name: $name, deleted: $deleted)" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_character.character"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.motions.rename("m1", "Wave"), {"motion_id": "m1", "name": "Wave"}),
+        (lambda c: c.motions.delete("m1"), {"motion_id": "m1", "deleted": True}),
+        (lambda c: c.motions.restore("m1"), {"motion_id": "m1", "deleted": False}),
+    ],
+)
+async def test_motion_lifecycle_uses_backend_argument_and_payload(call, expected_variables) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "m1", "name": "Wave", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_motion(motion_id: $motion_id, name: $name, deleted: $deleted)" in query
+    assert "motion {" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_motion.motion"
+
+
+@pytest.mark.asyncio
+async def test_motion_delete_reads_nested_motion_payload() -> None:
+    seen = []
+    record = {
+        "id": "m1",
+        "name": "Wave",
+        "org_id": "o1",
+        "created": "2026-11-04T00:00:00",
+        "updated": "2026-11-04T00:00:01",
+        "deleted": "2026-11-04T00:00:01",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"update_motion": {"motion": record}}})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    motion = await client.motions.delete("m1")
+    client.close()
+
+    assert motion == record
+    assert seen[0]["variables"] == {"motion_id": "m1", "deleted": True}
