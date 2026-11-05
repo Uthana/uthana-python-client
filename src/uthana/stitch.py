@@ -1,4 +1,4 @@
-"""Shared typed-step stitching, with legacy sampled-pose compatibility.
+"""Flat motion-step stitching, with legacy sampled-pose compatibility.
 
 Ordinary stitching is prepared by the service. Only legacy sampled-pose callers
 supply transforms; validation never establishes animation quality.
@@ -7,11 +7,11 @@ supply transforms; validation never establishes animation quality.
 import math
 import re
 from copy import deepcopy
-from typing import Any, Literal, Mapping, TypedDict, cast
+from typing import Any, Mapping, TypedDict, cast
 
 from .types import Motion
 
-MAX_FRAME_INDEX = 2**53 - 1
+MAX_FRAME_INDEX = 2**31 - 1
 MAX_OFFSET_METERS = 100
 MAX_TURN_DEGREES = 180
 MIN_TRANSITION_SECONDS = 0.1
@@ -112,82 +112,46 @@ def validate_stitch_params(params: Mapping[str, Any]) -> StitchParams:
     return cast(StitchParams, deepcopy(params))
 
 
-class StitchRange(TypedDict, total=False):
-    start_frame: int
-    end_frame: int
-    start_seconds: float
-    end_seconds: float
-
-
-class StitchPlacement(TypedDict, total=False):
-    forward_m: float
-    right_m: float
-    turn_degrees: float
-    absolute: Literal[False]
-
-
 class _MotionStepRequired(TypedDict):
-    type: Literal["motion"]
     motion_id: str
 
 
 class MotionStep(_MotionStepRequired, total=False):
-    range: StitchRange
-    placement: StitchPlacement
-
-
-class _TransitionStepRequired(TypedDict):
-    type: Literal["transition"]
-
-
-class TransitionStep(_TransitionStepRequired, total=False):
-    duration_seconds: float
+    trim_start_frame: int
+    trim_end_frame: int
+    trim_start_seconds: float
+    trim_end_seconds: float
+    transition_duration_seconds: float
+    transition_forward_meters: float
+    transition_right_meters: float
+    transition_facing_degrees: float
 
 
 class StitchInput(TypedDict):
     character_id: str
-    steps: list[MotionStep | TransitionStep]
-
-
-class ResolvedRange(TypedDict):
-    start_frame: int
-    end_frame: int
-    start_seconds: float
-    end_seconds: float
-
-
-class AutomaticPlacement(TypedDict):
-    mode: Literal["automatic"]
+    steps: list[MotionStep]
 
 
 class _ResolvedMotionRequired(TypedDict):
-    type: Literal["motion"]
     motion_id: str
-    range: ResolvedRange
+    trim_start_frame: int
+    trim_end_frame: int
+    trim_start_seconds: float
+    trim_end_seconds: float
 
 
 class ResolvedMotionStep(_ResolvedMotionRequired, total=False):
-    placement: StitchPlacement | AutomaticPlacement
-
-
-class ResolvedTransitionStep(TypedDict):
-    type: Literal["transition"]
-    duration_seconds: float
-
-
-class StitchResult(TypedDict):
-    motion: Motion
-    resolved_steps: list[ResolvedMotionStep | ResolvedTransitionStep]
+    transition_duration_seconds: float
+    transition_forward_meters: float
+    transition_right_meters: float
+    transition_facing_degrees: float
 
 
 def _allowed_fields(value: object, *, required: set[str], allowed: set[str]) -> dict[str, object]:
     if not isinstance(value, dict):
         raise ValueError("Stitch objects must be dictionaries")
-    missing_fields = not required <= value.keys()
-    has_unsupported_fields = bool(value.keys() - allowed)
-    if missing_fields or has_unsupported_fields:
+    if not required <= value.keys() or value.keys() - allowed:
         raise ValueError("Stitch input has missing or unsupported fields")
-    # Membership above establishes every key is one of the allowed strings.
     return cast(dict[str, object], value)
 
 
@@ -197,111 +161,79 @@ def _stitch_id(value: object) -> str:
     return value
 
 
-def _frame(value: object) -> int:
-    if type(value) is not int or not 0 <= value <= MAX_FRAME_INDEX:
-        raise ValueError("Frame indices must be nonnegative safe integers")
-    return value
-
-
-def _seconds(value: object) -> float:
-    number = _finite(value)
-    if number < 0:
-        raise ValueError("Range seconds must be nonnegative")
-    return float(number)
-
-
-def _validate_range(value: object) -> StitchRange:
-    fields = {"start_frame", "end_frame", "start_seconds", "end_seconds"}
-    selected = _allowed_fields(value, required=set(), allowed=fields)
-    has_frame_range = bool(selected.keys() & {"start_frame", "end_frame"})
-    has_second_range = bool(selected.keys() & {"start_seconds", "end_seconds"})
-    if has_frame_range and has_second_range:
-        raise ValueError("Use frames or seconds within a range, not both")
-    result: StitchRange = {}
-    if "start_frame" in selected:
-        result["start_frame"] = _frame(selected["start_frame"])
-    if "end_frame" in selected:
-        result["end_frame"] = _frame(selected["end_frame"])
-    if "start_seconds" in selected:
-        result["start_seconds"] = _seconds(selected["start_seconds"])
-    if "end_seconds" in selected:
-        result["end_seconds"] = _seconds(selected["end_seconds"])
-    start = result.get("start_frame", 0) if has_frame_range else result.get("start_seconds", 0.0)
-    end = result.get("end_frame") if has_frame_range else result.get("end_seconds")
-    if end is not None and end <= start:
-        raise ValueError("Range end must exceed start")
-    return result
-
-
-def _validate_placement(value: object) -> StitchPlacement:
-    selected = _allowed_fields(
-        value, required=set(), allowed={"forward_m", "right_m", "turn_degrees", "absolute"}
-    )
-    if selected.get("absolute", False) is not False:
-        raise ValueError("Only relative placement (absolute: false) is supported")
-    forward = float(_finite(selected.get("forward_m", 0.0)))
-    right = float(_finite(selected.get("right_m", 0.0)))
-    turn = float(_finite(selected.get("turn_degrees", 0.0)))
-    for name, number, limit in (
-        ("forward_m", forward, MAX_OFFSET_METERS),
-        ("right_m", right, MAX_OFFSET_METERS),
-        ("turn_degrees", turn, MAX_TURN_DEGREES),
-    ):
-        if not -limit <= number <= limit:
-            raise ValueError(f"{name} must be between {-limit} and {limit}")
-    return {"forward_m": forward, "right_m": right, "turn_degrees": turn, "absolute": False}
-
-
-def _validate_motion_step(value: object, *, arriving: bool) -> MotionStep:
-    selected = _allowed_fields(
-        value, required={"type", "motion_id"}, allowed={"type", "motion_id", "range", "placement"}
-    )
-    if selected["type"] != "motion":
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
-    result: MotionStep = {
-        "type": "motion",
-        "motion_id": _stitch_id(selected["motion_id"]),
-        "range": _validate_range(selected.get("range", {})),
+def _validate_motion_step(value: object, *, outgoing: bool) -> MotionStep:
+    frame_fields = {"trim_start_frame", "trim_end_frame"}
+    second_fields = {"trim_start_seconds", "trim_end_seconds"}
+    placement_limits = {
+        "transition_forward_meters": MAX_OFFSET_METERS,
+        "transition_right_meters": MAX_OFFSET_METERS,
+        "transition_facing_degrees": MAX_TURN_DEGREES,
     }
-    if "placement" in selected:
-        if not arriving:
-            raise ValueError("Placement is supported only on the arriving motion")
-        result["placement"] = _validate_placement(selected["placement"])
-    return result
-
-
-def _validate_transition_step(value: object) -> TransitionStep:
-    selected = _allowed_fields(value, required={"type"}, allowed={"type", "duration_seconds"})
-    if selected["type"] != "transition":
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
-    duration = float(_finite(selected.get("duration_seconds", DEFAULT_TRANSITION_SECONDS)))
-    if not MIN_TRANSITION_SECONDS <= duration <= MAX_TRANSITION_SECONDS:
-        raise ValueError("Transition duration must be 0.1-3 seconds")
-    return {"type": "transition", "duration_seconds": duration}
+    transition_fields = {"transition_duration_seconds", *placement_limits}
+    selected = _allowed_fields(
+        value,
+        required={"motion_id"},
+        allowed={"motion_id", *frame_fields, *second_fields, *transition_fields},
+    )
+    result: dict[str, object] = {"motion_id": _stitch_id(selected["motion_id"])}
+    has_frame_range = bool(selected.keys() & frame_fields)
+    has_second_range = bool(selected.keys() & second_fields)
+    if has_frame_range and has_second_range:
+        raise ValueError("Use frames or seconds within a trim, not both")
+    for key, item in selected.items():
+        if key == "motion_id":
+            continue
+        number = _finite(item)
+        if key in frame_fields:
+            if type(item) is not int or not 0 <= number <= MAX_FRAME_INDEX:
+                raise ValueError(f"{key} must be a nonnegative GraphQL integer")
+            result[key] = item
+        elif key in second_fields:
+            if number < 0:
+                raise ValueError(f"{key} must be nonnegative")
+            result[key] = float(number)
+        elif outgoing:
+            limit = placement_limits.get(key)
+            if limit is not None and not -limit <= number <= limit:
+                raise ValueError(f"{key} must be between {-limit} and {limit}")
+            if (
+                key == "transition_duration_seconds"
+                and not MIN_TRANSITION_SECONDS <= number <= MAX_TRANSITION_SECONDS
+            ):
+                raise ValueError("Transition duration must be 0.1-3 seconds")
+            result[key] = float(number)
+        # Final-step transition settings have scalar checks only and are discarded.
+    unit = "frame" if has_frame_range else "seconds"
+    start_key, end_key = f"trim_start_{unit}", f"trim_end_{unit}"
+    start = cast(int | float, result.get(start_key, 0))
+    if (end := result.get(end_key)) is not None and cast(int | float, end) <= start:
+        raise ValueError("Trim end must exceed start")
+    result[start_key] = start
+    if outgoing:
+        result.setdefault("transition_duration_seconds", DEFAULT_TRANSITION_SECONDS)
+        if selected.keys() & placement_limits.keys():
+            for key in placement_limits:
+                result.setdefault(key, 0.0)
+    return cast(MotionStep, result)
 
 
 def validate_stitch_input(value: object) -> StitchInput:
-    """Validate and copy typed steps without API calls or caller-owned mutations."""
+    """Validate and copy flat motion steps before preparation or paid work."""
     request = _allowed_fields(
         value, required={"character_id", "steps"}, allowed={"character_id", "steps"}
     )
     character_id = _stitch_id(request["character_id"])
-    if not isinstance(steps := request["steps"], list) or len(steps) != 3:
-        raise ValueError(
-            "Must include exactly three steps: a first motion, "
-            "a middle transition, and a second motion"
-        )
+    if not isinstance(steps := request["steps"], list) or len(steps) != 2:
+        raise ValueError("Must include exactly two motion objects")
     return {
         "character_id": character_id,
         "steps": [
-            _validate_motion_step(steps[0], arriving=False),
-            _validate_transition_step(steps[1]),
-            _validate_motion_step(steps[2], arriving=True),
+            _validate_motion_step(steps[0], outgoing=True),
+            _validate_motion_step(steps[1], outgoing=False),
         ],
     }
+
+
+class StitchResult(TypedDict):
+    motion: Motion
+    resolved_steps: list[ResolvedMotionStep]
