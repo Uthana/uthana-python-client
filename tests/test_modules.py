@@ -2,14 +2,17 @@
 
 """Unit tests for module methods using mocked _graphql and httpx."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from uthana import Uthana, UthanaCharacters
 from uthana.types import (
     CharacterPreviewResult,
     CreateFromGeneratedImageResult,
+    UthanaError,
 )
 
 # ---------------------------------------------------------------------------
@@ -515,3 +518,155 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
     call_vars = client._graphql.call_args[0][1]
     assert call_vars["fast"] is False
+
+
+# ---------------------------------------------------------------------------
+# Asset lifecycle: rename / delete / restore send only the changed fields
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.characters.rename("c1", "Knight"), {"character_id": "c1", "name": "Knight"}),
+        (lambda c: c.characters.delete("c1"), {"character_id": "c1", "deleted": True}),
+        (lambda c: c.characters.restore("c1"), {"character_id": "c1", "deleted": False}),
+    ],
+)
+async def test_character_lifecycle_variables(call, expected_variables) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "c1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_character(character_id: $character_id, name: $name, deleted: $deleted)" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_character.character"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.motions.rename("m1", "Wave"), {"motion_id": "m1", "name": "Wave"}),
+        (lambda c: c.motions.delete("m1"), {"motion_id": "m1", "deleted": True}),
+        (lambda c: c.motions.restore("m1"), {"motion_id": "m1", "deleted": False}),
+    ],
+)
+async def test_motion_lifecycle_uses_backend_argument_and_payload(call, expected_variables) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "m1", "name": "Wave", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_motion(motion_id: $motion_id, name: $name, deleted: $deleted)" in query
+    assert "motion {" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_motion.motion"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,kind,expected_changes",
+    [
+        (
+            lambda c: c.characters.rename("x1", "Knight", own_org_only=True),
+            "character",
+            {"name": "Knight"},
+        ),
+        (lambda c: c.characters.delete("x1", own_org_only=True), "character", {"deleted": True}),
+        (lambda c: c.characters.restore("x1", own_org_only=True), "character", {"deleted": False}),
+        (lambda c: c.motions.rename("x1", "Wave", own_org_only=True), "motion", {"name": "Wave"}),
+        (lambda c: c.motions.delete("x1", own_org_only=True), "motion", {"deleted": True}),
+        (lambda c: c.motions.restore("x1", own_org_only=True), "motion", {"deleted": False}),
+    ],
+)
+async def test_lifecycle_own_org_only_sends_backend_argument(call, kind, expected_changes) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "own_org_only: $own_org_only" in query
+    assert variables == {f"{kind}_id": "x1", **expected_changes, "own_org_only": True}
+    assert client._graphql.call_args.kwargs["path"] == f"update_{kind}.{kind}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["character", "motion"])
+async def test_lifecycle_default_omits_own_org_only(kind) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
+
+    await getattr(client, f"{kind}s").restore("x1")
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "own_org_only" not in query
+    assert "own_org_only" not in variables
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["character", "motion"])
+async def test_restore_not_owned_raises(kind) -> None:
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        error = {
+            "message": f"{kind} x1 does not belong to your organization.",
+            "type": "UserAccessRequired",
+        }
+        return httpx.Response(200, json={"data": None, "errors": [error]})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    with pytest.raises(UthanaError, match="does not belong to your organization"):
+        await getattr(client, f"{kind}s").restore("x1", own_org_only=True)
+    client.close()
+
+    assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False, "own_org_only": True}
+
+
+@pytest.mark.asyncio
+async def test_motion_delete_reads_nested_motion_payload() -> None:
+    seen = []
+    record = {
+        "id": "m1",
+        "name": "Wave",
+        "org_id": "o1",
+        "created": "2026-11-04T00:00:00",
+        "updated": "2026-11-04T00:00:01",
+        "deleted": "2026-11-04T00:00:01",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"update_motion": {"motion": record}}})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    motion = await client.motions.delete("m1")
+    client.close()
+
+    assert motion == record
+    assert seen[0]["variables"] == {"motion_id": "m1", "deleted": True}
+
+
+@pytest.mark.asyncio
+async def test_character_get_returns_owner_and_missing_is_404() -> None:
+    record = {"id": "c1", "name": "Knight", "org_id": "o1", "deleted": None}
+    responses = [{"character": record}, {"character": None}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["variables"] == {"character_id": "c1"}
+        return httpx.Response(200, json={"data": responses.pop(0)})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    assert await client.characters.get("c1") == record
+    with pytest.raises(UthanaError) as error:
+        await client.characters.get("c1")
+    client.close()
+
+    assert error.value.status_code == 404

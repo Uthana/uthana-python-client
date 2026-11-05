@@ -61,20 +61,23 @@ class Org(TypedDict, total=False):
 
 
 class Character(TypedDict, total=False):
-    """Character object from characters.list."""
+    """Character object from characters.list or update_character (rename/delete/restore)."""
+
+    id: str
+    name: str | None
+    org_id: str
+    created: str | None
+    updated: str | None
+    deleted: str | None
+
+
+class Motion(TypedDict, total=False):
+    """Motion object from motions.list or update_motion (rename/delete/restore)."""
 
     id: str
     name: str | None
     created: str | None
     updated: str | None
-
-
-class Motion(TypedDict, total=False):
-    """Motion object from motions.list or update_motion (delete/rename)."""
-
-    id: str
-    name: str | None
-    created: str | None
     deleted: str | None
     assets: list[dict]
     org_id: str
