@@ -95,3 +95,20 @@ def test_invalid_arguments_fail_before_any_request(kwargs) -> None:
     with pytest.raises(ValueError):
         client.org.get_ledger_sync(**kwargs)
     client.close()
+
+
+@pytest.mark.asyncio
+async def test_debit_asset_and_job_ids_pass_through_unchanged() -> None:
+    # The backend stores the charged motion in job_id and the processing job in task_id.
+    debit = {**ROW, "job_id": "mMotion123", "task_id": "J0000000001", "ref": "motion:mMotion123"}
+    captured = []
+
+    def handler(request):
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"payg_ledger": [debit]}})
+
+    client = client_for(handler)
+    [row] = await client.org.get_ledger(limit=1)
+    assert row["job_id"] == "mMotion123" and row["task_id"] == "J0000000001"
+    assert "job_id" in captured[0]["query"] and "task_id" in captured[0]["query"]
+    client.close()

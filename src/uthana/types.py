@@ -67,6 +67,15 @@ class LedgerEntry(TypedDict, total=False):
     generation), ``topup`` (a card payment), ``credit_grant`` (free credit) or
     ``adjustment`` (a signed staff correction). ``total_usd`` is unsigned for
     debits, top-ups and grants; read the direction from ``type``.
+
+    For a debit, ``job_id`` holds the ID of the asset that was charged (a motion
+    or character ID, despite the field name) and ``task_id`` holds the processing
+    job ID when the charge ran as a job (pass it to ``jobs.get``). ``ref`` names
+    the asset with its kind, such as ``motion:<id>`` or ``character:<id>``. A
+    failed generation has no asset:
+    ``job_id`` is empty, ``task_id`` is the failed job and ``ref`` is
+    ``job_failed:<job id>``. Top-ups, credit grants and adjustments carry no job
+    or asset; ``ref`` holds the payment or grant reference.
     """
 
     id: str
@@ -76,7 +85,9 @@ class LedgerEntry(TypedDict, total=False):
     balance_before: str
     balance_after: str
     job_id: str | None
+    """Charged asset (motion or character) ID, not a job ID."""
     task_id: str | None
+    """Processing job ID for a charge."""
     model: str | None
     model_version: str | None
     billing_unit: str | None
