@@ -157,7 +157,9 @@ TtmModelType = Literal[
     "text-to-motion-bucmd",
 ]
 TtmJobModelType = Literal["text-to-motion-3.0"]
-VtmModelType = Literal["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2"]
+VtmModelType = Literal[
+    "video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-3.0", "video-to-motion-v2"
+]
 ModelType = Literal["auto"] | TtmModelType | TtmJobModelType | VtmModelType
 OutputFormat = Literal["glb", "fbx", "bvh"]
 
