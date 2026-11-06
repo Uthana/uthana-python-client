@@ -1,6 +1,6 @@
 # Legacy sampled-pose stitching
 
-Use [typed-step stitching](stitching.md) for ordinary joins. The following method is retained for existing callers.
+Use [stitching](stitching.md) for ordinary joins. The following method is retained for existing callers.
 
 ### Advanced sampled-pose stitching
 
