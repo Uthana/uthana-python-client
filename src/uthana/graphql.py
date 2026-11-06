@@ -398,6 +398,20 @@ query DownloadAllowed($motion_id: String!, $character_id: String!) {
 }
 """
 
+    CREATE_SHARE_LINK = """
+mutation CreateShareLink(
+    $character_id: String!, $motion_id: String!, $start: Float!, $end: Float!,
+    $fps: Int!, $wd: Int!, $ht: Int!
+) {
+    create_share_link(
+        character_id: $character_id, motion_id: $motion_id, start: $start, end: $end,
+        fps: $fps, wd: $wd, ht: $ht
+    ) {
+        png_url
+    }
+}
+"""
+
     GET_USAGE = """
 query Usage {
     org {
