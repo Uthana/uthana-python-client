@@ -151,6 +151,55 @@ async def test_asset_methods_enforce_size_bound(method: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_robot_download_uses_csv_route_and_long_timeout() -> None:
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, content=b"Frame,root_x\n0,0.0\n")
+
+    client = client_for(handler)
+    data = await client.motions.download_robot("char1", "motion1", fps=60, max_bytes=100)
+    assert data == b"Frame,root_x\n0,0.0\n"
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == (
+        "/motion/file/motion_viewer/char1/motion1/csv/unitree_g1_char1-motion1.csv"
+    )
+    assert dict(requests[0].url.params) == {"fps": "60"}
+    assert requests[0].extensions["timeout"]["read"] == 660.0
+    assert requests[0].extensions["timeout"]["connect"] == 15.0
+    await client.motions.download_robot("char1", "motion1")
+    assert not requests[1].url.query
+    client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"robot": "spot"}, "Robot must be unitree_g1"),
+        ({"fps": 25}, "24, 30, or 60"),
+        ({"fps": True}, "24, 30, or 60"),
+        ({"fps": "30"}, "24, 30, or 60"),
+    ],
+)
+async def test_robot_download_rejects_invalid_options_before_network(kwargs, message) -> None:
+    client = client_for(lambda _: pytest.fail("Unexpected HTTP request"))
+    with pytest.raises(ValueError, match=message):
+        await client.motions.download_robot("char1", "motion1", **kwargs)
+    client.close()
+
+
+def test_robot_download_sync_and_size_bound() -> None:
+    client = client_for(lambda _: httpx.Response(200, content=b"oversized"))
+    with pytest.raises(UthanaError) as error:
+        client.motions.download_robot_sync("char1", "motion1", max_bytes=3)
+    assert error.value.kind == "response_too_large"
+    assert client.motions.download_robot_sync("char1", "motion1", fps=24) == b"oversized"
+    client.close()
+
+
+@pytest.mark.asyncio
 async def test_preview_invalid_format_never_requests_network() -> None:
     client = client_for(lambda _: pytest.fail("Unexpected HTTP request"))
     with pytest.raises(ValueError, match="Preview format"):
