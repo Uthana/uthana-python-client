@@ -7,4 +7,4 @@ models = ["text-to-motion-1.0", "text-to-motion-2.0"]
 
 [vtm]
 default = "video-to-motion-2.0"
-models = ["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2"]
+models = ["video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-3.0", "video-to-motion-v2"]
