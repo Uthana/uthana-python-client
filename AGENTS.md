@@ -36,6 +36,10 @@ Keep tests offline and deterministic. Live tests must be explicitly configured; 
 
 Review the full PR diff for style, bugs, security, unnecessary abstractions, and compatibility. Report the checks actually run and distinguish manual review from automated tooling. Keep detailed feature documentation under `docs/`, use simple then advanced examples, and keep each guide self-contained. Never merge or publish without authorization.
 
+## Review tooling
+
+Hosted Cursor/Bugbot reviews are not enabled for this repository. Do not post `@cursor review`, `bugbot run`, or other trigger comments, including as a probe. Use local bug and security reviews of the complete diff against the PR base, fix actionable findings, and repeat affected checks after the final fix. Report local review accurately; do not describe it as a hosted Bugbot pass. Check this policy separately for each repository before batching review requests: a generic request for final reviews or coverage in another repository does not override this rule. Do not enable hosted review as a prerequisite for completing a PR.
+
 ## Public code review
 
 Hosted Codex review is requested manually only after a maintainer verifies coverage through a dedicated public-only review connection. Until then, use local full-diff bug, security and style reviews; do not treat an organization App installation as proof of coverage. Do not enable automatic reviews or change required CI/merge approvals as part of a review.

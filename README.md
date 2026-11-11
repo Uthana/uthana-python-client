@@ -339,7 +339,7 @@ async def video_to_motion():
 asyncio.run(video_to_motion())
 ```
 
-**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`.
+**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`, `video-to-motion-3.0`.
 
 ## Characters
 
