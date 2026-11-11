@@ -641,3 +641,16 @@ Supply either an API key or `access_token`. Existing API-key calls remain suppor
 credentials before requests. Use its asynchronous auth flow for asynchronous client methods;
 synchronous helpers and initialization telemetry require a synchronous flow.
 The client does not perform OAuth account linking or retry paid mutations automatically.
+
+### Trial job limits
+
+Organizations without a valid saved payment method may have up to four queued,
+delayed, or running jobs per type, shared by every member. TTM and VTM have
+separate limits; selecting two VTM models uses two VTM slots. Funds reserved for
+pending generations also reduce the balance available for new work.
+
+A submission rejected at the limit raises `UthanaError` with `status_code == 429`.
+Its `response_data` contains the GraphQL error with `code="job_limit_exceeded"`.
+Wait for an existing job to finish before submitting again. The client does not
+retry automatically. Submit one generation per request: if a custom GraphQL
+request contains several mutations, inspect every result before retrying it.
