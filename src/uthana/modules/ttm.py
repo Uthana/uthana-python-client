@@ -9,7 +9,14 @@ from typing import cast
 
 from ..graphql import q
 from ..models import models
-from ..types import Job, TextToMotionResult, TtmJobModelType, TtmModelType, UthanaCharacters
+from ..types import (
+    Job,
+    LibrarySearchResult,
+    TextToMotionResult,
+    TtmJobModelType,
+    TtmModelType,
+    UthanaCharacters,
+)
 from ..utils import normalize_model_name
 from ._base import _BaseModule
 
@@ -75,6 +82,40 @@ class TtmModule(_BaseModule):
                 internal_ik=internal_ik,
             ),
         )
+
+    async def library_search(
+        self, prompt: str, *, character_id: str | None = None
+    ) -> LibrarySearchResult:
+        """Find the library motion that best matches a prompt and add it to your organization.
+
+        Searches Uthana's shared motion library plus your organization's labeled motions by
+        meaning, picks the single closest clip, and copies that clip into your organization as a
+        new motion. This is a charged operation billed per second of the returned clip
+        ("library-search-1.0", see https://uthana.com/docs/api/pricing), even when the match is
+        weak. It returns one motion, not a list of candidates, and an unrelated result does not
+        prove the library lacks a better clip.
+        """
+        variables = {"prompt": prompt, "character_id": character_id}
+        data = await self._client._graphql(
+            q.LIBRARY_SEARCH, variables, path="create_text_to_motion"
+        )
+        motion = data["motion"]
+        tags = motion.get("tags") or {}
+        score = tags.get("Distance") if isinstance(tags, dict) else None
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            score = None
+        return LibrarySearchResult(
+            character_id=character_id if character_id is not None else UthanaCharacters.tar,
+            motion_id=motion["id"],
+            name=motion.get("name"),
+            match_score=None if score is None else float(score),
+        )
+
+    def library_search_sync(
+        self, prompt: str, *, character_id: str | None = None
+    ) -> LibrarySearchResult:
+        """Find and copy the best-matching library motion (sync). Charged; see library_search."""
+        return asyncio.run(self.library_search(prompt, character_id=character_id))
 
     async def create_job(
         self,

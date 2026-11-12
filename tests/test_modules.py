@@ -2,14 +2,18 @@
 
 """Unit tests for module methods using mocked _graphql and httpx."""
 
+import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from uthana import Uthana, UthanaCharacters
 from uthana.types import (
     CharacterPreviewResult,
     CreateFromGeneratedImageResult,
+    UthanaError,
 )
 
 # ---------------------------------------------------------------------------
@@ -515,3 +519,207 @@ async def test_ttm_create_job_defaults_fast_to_false() -> None:
 
     call_vars = client._graphql.call_args[0][1]
     assert call_vars["fast"] is False
+
+
+# ---------------------------------------------------------------------------
+# Asset lifecycle and library search
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.characters.rename("c1", "Knight"), {"character_id": "c1", "name": "Knight"}),
+        (lambda c: c.characters.delete("c1"), {"character_id": "c1", "deleted": True}),
+        (lambda c: c.characters.restore("c1"), {"character_id": "c1", "deleted": False}),
+    ],
+)
+async def test_character_lifecycle_variables(call: Any, expected_variables: Any) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "c1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_character(character_id: $character_id, name: $name, deleted: $deleted)" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_character.character"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,expected_variables",
+    [
+        (lambda c: c.motions.rename("m1", "Wave"), {"motion_id": "m1", "name": "Wave"}),
+        (lambda c: c.motions.delete("m1"), {"motion_id": "m1", "deleted": True}),
+        (lambda c: c.motions.restore("m1"), {"motion_id": "m1", "deleted": False}),
+    ],
+)
+async def test_motion_lifecycle_uses_backend_argument_and_payload(
+    call: Any, expected_variables: Any
+) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "m1", "name": "Wave", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "update_motion(motion_id: $motion_id, name: $name, deleted: $deleted)" in query
+    assert "motion {" in query
+    assert variables == expected_variables
+    assert client._graphql.call_args.kwargs["path"] == "update_motion.motion"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "call,kind,expected_changes",
+    [
+        (
+            lambda c: c.characters.rename("x1", "Knight"),
+            "character",
+            {"name": "Knight"},
+        ),
+        (lambda c: c.characters.delete("x1"), "character", {"deleted": True}),
+        (lambda c: c.characters.restore("x1"), "character", {"deleted": False}),
+        (lambda c: c.motions.rename("x1", "Wave"), "motion", {"name": "Wave"}),
+        (lambda c: c.motions.delete("x1"), "motion", {"deleted": True}),
+        (lambda c: c.motions.restore("x1"), "motion", {"deleted": False}),
+    ],
+)
+async def test_lifecycle_uses_standard_backend_update(
+    call: Any, kind: str, expected_changes: Any
+) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
+
+    await call(client)
+
+    query, variables = client._graphql.call_args[0][:2]
+    assert "own_org_only" not in query
+    assert variables == {f"{kind}_id": "x1", **expected_changes}
+    assert client._graphql.call_args.kwargs["path"] == f"update_{kind}.{kind}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["character", "motion"])
+async def test_restore_preserves_existing_write_denial(kind: str) -> None:
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        error = {
+            "message": "This resource requires user access.",
+            "type": "UserAccessRequired",
+        }
+        return httpx.Response(200, json={"data": None, "errors": [error]})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    with pytest.raises(UthanaError, match="This resource requires user access") as error:
+        await getattr(client, f"{kind}s").restore("x1")
+    assert error.value.kind == "graphql"
+    client.close()
+
+    assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False}
+
+
+@pytest.mark.asyncio
+async def test_motion_delete_reads_nested_motion_payload() -> None:
+    seen = []
+    record = {
+        "id": "m1",
+        "name": "Wave",
+        "org_id": "o1",
+        "created": "2026-11-04T00:00:00",
+        "updated": "2026-11-04T00:00:01",
+        "deleted": "2026-11-04T00:00:01",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"update_motion": {"motion": record}}})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    motion = await client.motions.delete("m1")
+    client.close()
+
+    assert motion == record
+    assert seen[0]["variables"] == {"motion_id": "m1", "deleted": True}
+
+
+@pytest.mark.asyncio
+async def test_character_get_returns_owner_and_missing_is_404() -> None:
+    record = {"id": "c1", "name": "Knight", "org_id": "o1", "deleted": None}
+    responses = [{"character": record}, {"character": None}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["variables"] == {"character_id": "c1"}
+        return httpx.Response(200, json={"data": responses.pop(0)})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
+    assert await client.characters.get("c1") == record
+    with pytest.raises(UthanaError) as error:
+        await client.characters.get("c1")
+    client.close()
+
+    assert error.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_sends_nearest_neighbor_and_parses_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={
+            "motion": {
+                "id": "mLib1",
+                "name": "NN: a person waving",
+                "tags": {"Method": "NearestNeighborRaw", "Nearest": "lX", "Distance": 0.8123},
+            }
+        }
+    )
+
+    result = await client.ttm.library_search("a person waving", character_id="cAva")
+
+    call_query, call_vars = client._graphql.call_args[0][0], client._graphql.call_args[0][1]
+    assert 'model: "nearest-neighbor"' in call_query
+    assert call_vars == {"prompt": "a person waving", "character_id": "cAva"}
+    assert client._graphql.call_args.kwargs["path"] == "create_text_to_motion"
+    assert result.motion_id == "mLib1"
+    assert result.character_id == "cAva"
+    assert result.name == "NN: a person waving"
+    assert result.match_score == pytest.approx(0.8123)
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_defaults_to_tar_and_tolerates_missing_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={"motion": {"id": "mLib2", "name": "NN: jump", "tags": {}}}
+    )
+
+    result = await client.ttm.library_search("jump")
+
+    assert client._graphql.call_args[0][1]["character_id"] is None
+    assert result.character_id == UthanaCharacters.tar
+    assert result.match_score is None
+
+
+@pytest.mark.asyncio
+async def test_ttm_library_search_ignores_non_numeric_score() -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(
+        return_value={"motion": {"id": "mLib3", "name": "NN: x", "tags": {"Distance": True}}}
+    )
+
+    result = await client.ttm.library_search("x")
+
+    assert result.match_score is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", [None, ""])
+async def test_library_search_preserves_unnamed_assets(name: str | None) -> None:
+    client = _make_client()
+    client._graphql = AsyncMock(return_value={"motion": {"id": "mLib", "name": name}})
+    result = await client.ttm.library_search("wave")
+    assert result.name == name

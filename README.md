@@ -39,6 +39,7 @@ integrations share one implementation.
   for transfer and processing. These phase limits are not an overall deadline.
 - `org.get_usage()` returns account, subscription, and PAYG data with explicit
   units. `org.get_prices()` returns current rates. Neither computes a per-job bill.
+- `org.get_ledger(limit=50, before_id=None, since=None, until=None, types=None)` returns recorded PAYG charges, payments and credits, newest first, with the charged motion or character in `ref` (`motion:<id>` or `character:<id>`) and in `job_id`, which despite its name holds that asset ID; the processing job ID is in `task_id`. Page with the last entry's `id` as `before_id`. Organizations on a legacy monthly plan have no ledger rows.
 
 Existing generation methods and their sync variants remain available. New module
 methods also have `_sync` variants. Optional export switches retain backend defaults
@@ -159,6 +160,17 @@ asyncio.run(text_to_motion())
 ```
 
 **Available models:** `text-to-motion-1.0` (default), `text-to-motion-2.0`.
+
+### Library search (ttm.library_search)
+
+Find the existing Uthana library motion that best matches a prompt instead of generating a new one. The search covers Uthana's shared motion library and your organization's labeled motions, picks the single closest clip by meaning, and copies it into your organization as a new motion you can preview, retarget and download like any other.
+
+```python
+result = await uthana_client.ttm.library_search("a person stepping back to block", character_id=UthanaCharacters.manny)
+print(result.motion_id, result.name, result.match_score)  # match_score: 1.0 = identical description
+```
+
+Library search is a charged operation (`library-search-1.0`, billed per second of the returned clip; see [pricing](https://uthana.com/docs/api/pricing)), charged even when the match is weak. It returns one motion, not a list of candidates, and an unrelated result does not prove the library lacks a better clip. Sync variant: `uthana_client.ttm.library_search_sync(...)`.
 
 ## Text to motion 3.0 async job (ttm.create_job)
 
@@ -391,9 +403,13 @@ async def manage_characters():
     # Image-to-character: upload an image file (always one-shot)
     result = await uthana_client.characters.create_from_image("path/to/reference.png")
 
-    # Rename or delete
+    # Read one character (includes the owning org_id), then rename, soft-delete, or restore it.
+    # Motions are kept when a character is deleted.
+    character = await uthana_client.characters.get(result.character["id"])
     await uthana_client.characters.rename(result.character["id"], "New name")
-    await uthana_client.characters.delete(result.character["id"])
+    deleted = await uthana_client.characters.delete(result.character["id"])
+    print(deleted["deleted"])  # deletion timestamp
+    await uthana_client.characters.restore(result.character["id"])
 
 
 asyncio.run(manage_characters())
@@ -474,8 +490,9 @@ async def manage_motions():
     # Rename a motion
     await uthana_client.motions.rename("motion-id", "New name")
 
-    # Delete a motion (soft delete)
+    # Delete a motion (soft delete), then restore it
     await uthana_client.motions.delete("motion-id")
+    await uthana_client.motions.restore("motion-id")
 
     # Favorite / unfavorite
     await uthana_client.motions.favorite("motion-id", True)
