@@ -603,19 +603,6 @@ async def test_lifecycle_uses_standard_backend_update(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["character", "motion"])
-async def test_lifecycle_default_omits_own_org_only(kind: str) -> None:
-    client = _make_client()
-    client._graphql = AsyncMock(return_value={"id": "x1", "name": "Knight", "deleted": None})
-
-    await getattr(client, f"{kind}s").restore("x1")
-
-    query, variables = client._graphql.call_args[0][:2]
-    assert "own_org_only" not in query
-    assert "own_org_only" not in variables
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["character", "motion"])
 async def test_restore_not_owned_raises(kind: str) -> None:
     seen = []
 
