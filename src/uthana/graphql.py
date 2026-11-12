@@ -6,6 +6,25 @@
 class _GraphQL:
     """Namespace for GraphQL query and mutation strings. Use: from uthana.graphql import q."""
 
+    LIBRARY_SEARCH = """
+mutation LibrarySearch(
+    $prompt: String!,
+    $character_id: String
+) {
+    create_text_to_motion(
+        prompt: $prompt,
+        character_id: $character_id,
+        model: "nearest-neighbor"
+    ) {
+        motion {
+            id
+            name
+            tags
+        }
+    }
+}
+"""
+
     TEXT_TO_MOTION_VQVAE_V1 = """
 mutation TextToMotion(
     $prompt: String!,
@@ -272,23 +291,50 @@ mutation CreateCharacterFromImage(
 }
 """
 
-    RENAME_CHARACTER = """
-mutation RenameCharacter($character_id: String!, $name: String!) {
-    update_character(character_id: $character_id, name: $name) {
+    GET_CHARACTER = """
+query GetCharacter($character_id: String!) {
+    character(id: $character_id) {
+        id
+        name
+        org_id
+        created
+        updated
+        deleted
+    }
+}
+"""
+
+    UPDATE_CHARACTER = """
+mutation UpdateCharacter($character_id: String!, $name: String, $deleted: Boolean) {
+    update_character(character_id: $character_id, name: $name, deleted: $deleted) {
         character {
             id
             name
+            org_id
+            created
+            updated
+            deleted
         }
     }
 }
 """
 
-    DELETE_CHARACTER = """
-mutation DeleteCharacter($character_id: String!) {
-    update_character(character_id: $character_id, deleted: true) {
+    # Same update, refused by the backend unless the caller's organization owns the character
+    # (admin accounts included). Needs a backend with the own_org_only argument.
+    UPDATE_CHARACTER_OWN_ORG = """
+mutation UpdateCharacterOwnOrg(
+    $character_id: String!, $name: String, $deleted: Boolean, $own_org_only: Boolean
+) {
+    update_character(
+        character_id: $character_id, name: $name, deleted: $deleted, own_org_only: $own_org_only
+    ) {
         character {
             id
             name
+            org_id
+            created
+            updated
+            deleted
         }
     }
 }
@@ -337,11 +383,37 @@ query LocomotionStyles {
 """
 
     UPDATE_MOTION = """
-mutation update_motion($id: String!, $name: String, $deleted: Boolean) {
-    update_motion(id: $id, name: $name, deleted: $deleted) {
-        id
-        name
-        deleted
+mutation UpdateMotion($motion_id: String!, $name: String, $deleted: Boolean) {
+    update_motion(motion_id: $motion_id, name: $name, deleted: $deleted) {
+        motion {
+            id
+            name
+            org_id
+            created
+            updated
+            deleted
+        }
+    }
+}
+"""
+
+    # Same update, refused by the backend unless the caller's organization owns the motion
+    # (admin accounts included). Needs a backend with the own_org_only argument.
+    UPDATE_MOTION_OWN_ORG = """
+mutation UpdateMotionOwnOrg(
+    $motion_id: String!, $name: String, $deleted: Boolean, $own_org_only: Boolean
+) {
+    update_motion(
+        motion_id: $motion_id, name: $name, deleted: $deleted, own_org_only: $own_org_only
+    ) {
+        motion {
+            id
+            name
+            org_id
+            created
+            updated
+            deleted
+        }
     }
 }
 """
@@ -368,6 +440,7 @@ query GetMotion($motion_id: String!) {
     motion(id: $motion_id) {
         id
         name
+        org_id
         assets { id uid type sha256 metadata }
     }
 }
@@ -408,6 +481,12 @@ query Usage {
     subscription { status secs_per_month characters }
     payg_prices { model_key billing_unit unit_price }
 }
+"""
+
+    LEDGER_FIELDS = """
+        id created type total_usd balance_before balance_after
+        job_id task_id model model_version billing_unit quantity unit_price
+        ref status
 """
 
     GET_PRICES = """
