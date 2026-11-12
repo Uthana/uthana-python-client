@@ -52,7 +52,15 @@ class _Models:
         )
         self.vtm = _Capability(
             cast(VtmModelType, _get("vtm", "default", "video-to-motion-2.0")),
-            _models("vtm", ("video-to-motion-2.0", "video-to-motion-2.1", "video-to-motion-v2")),
+            _models(
+                "vtm",
+                (
+                    "video-to-motion-2.0",
+                    "video-to-motion-2.1",
+                    "video-to-motion-3.0",
+                    "video-to-motion-v2",
+                ),
+            ),
         )
 
 
