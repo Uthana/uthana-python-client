@@ -493,8 +493,7 @@ class MotionsModule(_BaseModule):
         motion = quote(motion_id, safe="")
         preview_url = f"{self._client.base_url}/app/preview/{character}/{motion}"
         if (start, end) != SHARE_FULL_WINDOW:
-            # The web app sends the window with two decimals; the viewer reads it the same way.
-            preview_url += f"?start={start:.2f}&end={end:.2f}"
+            preview_url += f"?start={start}&end={end}"
         return ShareLink(
             character_id=character_id,
             motion_id=motion_id,

@@ -50,13 +50,13 @@ async def test_share_returns_public_viewer_link_without_window() -> None:
 
 
 @pytest.mark.asyncio
-async def test_share_window_is_appended_with_two_decimals_and_ids_are_quoted() -> None:
+async def test_share_window_keeps_precision_and_ids_are_quoted() -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"png_url": PNG_URL})
 
     link = await client.motions.share("c/1", "m 1", start=0.125, end=0.5)
 
-    assert link["preview_url"] == "https://uthana.com/app/preview/c%2F1/m%201?start=0.12&end=0.50"
+    assert link["preview_url"] == "https://uthana.com/app/preview/c%2F1/m%201?start=0.125&end=0.5"
     assert link["start"] == 0.125 and link["end"] == 0.5
 
 
@@ -124,4 +124,4 @@ def test_share_sync_wraps_async() -> None:
     client = _make_client()
     client._graphql = AsyncMock(return_value={"png_url": PNG_URL})
     link = client.motions.share_sync("char1", "motion1", start=0.0, end=0.5)
-    assert link["preview_url"].endswith("?start=0.00&end=0.50")
+    assert link["preview_url"].endswith("?start=0.0&end=0.5")
