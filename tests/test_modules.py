@@ -609,14 +609,15 @@ async def test_restore_not_owned_raises(kind: str) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(json.loads(request.content))
         error = {
-            "message": f"{kind} x1 does not belong to your organization.",
-            "type": "UserAccessRequired",
+            "message": "Resource not found.",
+            "type": "ResourceNotFound",
         }
-        return httpx.Response(200, json={"data": None, "errors": [error]})
+        return httpx.Response(404, json={"data": None, "errors": [error]})
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
-    with pytest.raises(UthanaError, match="does not belong to your organization"):
+    with pytest.raises(UthanaError, match="Resource not found") as error:
         await getattr(client, f"{kind}s").restore("x1")
+    assert error.value.status_code == 404
     client.close()
 
     assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False}
