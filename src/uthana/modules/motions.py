@@ -126,10 +126,10 @@ class MotionsModule(_BaseModule):
         *,
         timeout: float | httpx.Timeout | None = 360,
     ) -> StitchResult:
-        """Stitch motion/transition/motion steps with server sampling and alignment.
+        """Stitch two flat motion steps with server sampling and alignment.
 
         Ranges use native frames or seconds. Omitted placement continues travel;
-        explicit placement uses relative meters and rightward degrees. No retries.
+        outgoing placement fields use relative meters and rightward degrees. No retries.
         Requires server support for stitch(input: StitchInput!).
         """
         result = await self._client._graphql(
@@ -145,7 +145,7 @@ class MotionsModule(_BaseModule):
             and isinstance(motion_id := motion.get("id"), str)
             and bool(motion_id.strip())
         )
-        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 3
+        has_valid_resolved_steps = isinstance(resolved_steps, list) and len(resolved_steps) == 2
         if not is_valid_motion:
             raise UthanaError(
                 200,
@@ -155,8 +155,7 @@ class MotionsModule(_BaseModule):
         if not has_valid_resolved_steps:
             raise UthanaError(
                 200,
-                "Stitch result must include exactly three resolved steps: "
-                "a first motion, a middle transition, and a second motion",
+                "Stitch result must include exactly two resolved steps",
                 kind="uncertain",
             )
         return cast(StitchResult, result)
@@ -520,30 +519,47 @@ class MotionsModule(_BaseModule):
         )
 
     async def delete(self, motion_id: str) -> Motion:
-        """Soft-delete a motion by ID."""
-        return await self._client._graphql(
-            q.UPDATE_MOTION,
-            {"id": motion_id, "deleted": True},
-            path="update_motion",
-            return_type=Motion,
-        )
+        """Soft-delete a motion by ID. Returns the record with ``deleted`` set.
+
+        Use ``restore`` to undo.
+        The account's existing API write permissions apply.
+        """
+        return await self._update(motion_id, {"deleted": True})
 
     def delete_sync(self, motion_id: str) -> Motion:
         """Soft-delete a motion by ID (sync)."""
         return asyncio.run(self.delete(motion_id))
 
+    async def restore(self, motion_id: str) -> Motion:
+        """Restore a soft-deleted motion by ID. Returns the record with ``deleted`` cleared.
+
+        The account's existing API write permissions apply.
+        """
+        return await self._update(motion_id, {"deleted": False})
+
+    def restore_sync(self, motion_id: str) -> Motion:
+        """Restore a soft-deleted motion by ID (sync)."""
+        return asyncio.run(self.restore(motion_id))
+
     async def rename(self, motion_id: str, new_name: str) -> Motion:
-        """Rename a motion by ID."""
-        return await self._client._graphql(
-            q.UPDATE_MOTION,
-            {"id": motion_id, "name": new_name},
-            path="update_motion",
-            return_type=Motion,
-        )
+        """Rename a motion by ID. Returns the updated record.
+
+        The account's existing API write permissions apply.
+        """
+        return await self._update(motion_id, {"name": new_name})
 
     def rename_sync(self, motion_id: str, new_name: str) -> Motion:
         """Rename a motion by ID (sync)."""
         return asyncio.run(self.rename(motion_id, new_name))
+
+    async def _update(self, motion_id: str, changes: dict[str, object]) -> Motion:
+        """Send only the changed fields; an explicit null would clear the backend value."""
+        return await self._client._graphql(
+            q.UPDATE_MOTION,
+            {"motion_id": motion_id, **changes},
+            path="update_motion.motion",
+            return_type=Motion,
+        )
 
     async def favorite(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite."""

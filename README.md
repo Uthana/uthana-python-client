@@ -42,6 +42,7 @@ integrations share one implementation.
   for transfer and processing. These phase limits are not an overall deadline.
 - `org.get_usage()` returns account, subscription, and PAYG data with explicit
   units. `org.get_prices()` returns current rates. Neither computes a per-job bill.
+- `org.get_ledger(limit=50, before_id=None, since=None, until=None, types=None)` returns recorded PAYG charges, payments and credits, newest first, with the charged motion or character in `ref` (`motion:<id>` or `character:<id>`) and in `job_id`, which despite its name holds that asset ID; the processing job ID is in `task_id`. Page with the last entry's `id` as `before_id`. Organizations on a legacy monthly plan have no ledger rows.
 
 Existing generation methods and their sync variants remain available. New module
 methods also have `_sync` variants. Optional export switches retain backend defaults
@@ -163,6 +164,17 @@ asyncio.run(text_to_motion())
 
 **Available models:** `text-to-motion-1.0` (default), `text-to-motion-2.0`.
 
+### Library search (ttm.library_search)
+
+Find the existing Uthana library motion that best matches a prompt instead of generating a new one. The search covers Uthana's shared motion library and your organization's labeled motions, picks the single closest clip by meaning, and copies it into your organization as a new motion you can preview, retarget and download like any other.
+
+```python
+result = await uthana_client.ttm.library_search("a person stepping back to block", character_id=UthanaCharacters.manny)
+print(result.motion_id, result.name, result.match_score)  # match_score: 1.0 = identical description
+```
+
+Library search is a charged operation (`library-search-1.0`, billed per second of the returned clip; see [pricing](https://uthana.com/docs/api/pricing)), charged even when the match is weak. It returns one motion, not a list of candidates, and an unrelated result does not prove the library lacks a better clip. Sync variant: `uthana_client.ttm.library_search_sync(...)`.
+
 ## Text to motion 3.0 async job (ttm.create_job)
 
 `text-to-motion-3.0` runs as an async job and returns a job dict to poll — the same pattern as video-to-motion. Available to any account on the [pay-as-you-go plan](https://uthana.com/docs/api/pricing).
@@ -271,9 +283,8 @@ Join two motions with automatic positioning. The server handles sampling and ali
 result = await uthana_client.motions.stitch({
     "character_id": character_id,
     "steps": [
-        {"type": "motion", "motion_id": first_motion_id},
-        {"type": "transition", "duration_seconds": 1.0},
-        {"type": "motion", "motion_id": second_motion_id},
+        {"motion_id": first_motion_id},
+        {"motion_id": second_motion_id},
     ],
 })
 print(result["motion"]["id"], result["resolved_steps"])
@@ -288,16 +299,14 @@ result = await uthana_client.motions.stitch({
     "character_id": character_id,
     "steps": [
         {
-            "type": "motion",
             "motion_id": first_motion_id,
-            "range": {"start_frame": 12, "end_frame": 60},
+            "trim_start_frame": 12, "trim_end_frame": 60,
+            "transition_duration_seconds": 1.5,
+            "transition_forward_meters": 1.0, "transition_right_meters": 0.5, "transition_facing_degrees": 45.0,
         },
-        {"type": "transition", "duration_seconds": 1.5},
         {
-            "type": "motion",
             "motion_id": second_motion_id,
-            "range": {"start_seconds": 0.5, "end_seconds": 3.0},
-            "placement": {"forward_m": 1.0, "right_m": 0.5, "turn_degrees": 45.0},
+            "trim_start_seconds": 0.5, "trim_end_seconds": 3.0,
         },
     ],
 })
@@ -345,7 +354,7 @@ async def video_to_motion():
 asyncio.run(video_to_motion())
 ```
 
-**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`.
+**Available models:** `video-to-motion-2.0` (default), `video-to-motion-2.1`, `video-to-motion-3.0`.
 
 ## Characters
 
@@ -397,9 +406,13 @@ async def manage_characters():
     # Image-to-character: upload an image file (always one-shot)
     result = await uthana_client.characters.create_from_image("path/to/reference.png")
 
-    # Rename or delete
+    # Read one character (includes the owning org_id), then rename, soft-delete, or restore it.
+    # Motions are kept when a character is deleted.
+    character = await uthana_client.characters.get(result.character["id"])
     await uthana_client.characters.rename(result.character["id"], "New name")
-    await uthana_client.characters.delete(result.character["id"])
+    deleted = await uthana_client.characters.delete(result.character["id"])
+    print(deleted["deleted"])  # deletion timestamp
+    await uthana_client.characters.restore(result.character["id"])
 
 
 asyncio.run(manage_characters())
@@ -489,8 +502,9 @@ async def manage_motions():
     # Rename a motion
     await uthana_client.motions.rename("motion-id", "New name")
 
-    # Delete a motion (soft delete)
+    # Delete a motion (soft delete), then restore it
     await uthana_client.motions.delete("motion-id")
+    await uthana_client.motions.restore("motion-id")
 
     # Favorite / unfavorite
     await uthana_client.motions.favorite("motion-id", True)
@@ -656,3 +670,16 @@ Supply either an API key or `access_token`. Existing API-key calls remain suppor
 credentials before requests. Use its asynchronous auth flow for asynchronous client methods;
 synchronous helpers and initialization telemetry require a synchronous flow.
 The client does not perform OAuth account linking or retry paid mutations automatically.
+
+### Trial job limits
+
+Organizations without a valid saved payment method may have up to four queued,
+delayed, or running jobs per type, shared by every member. TTM and VTM have
+separate limits; selecting two VTM models uses two VTM slots. Funds reserved for
+pending generations also reduce the balance available for new work.
+
+A submission rejected at the limit raises `UthanaError` with `status_code == 429`.
+Its `response_data` contains the GraphQL error with `code="job_limit_exceeded"`.
+Wait for an existing job to finish before submitting again. The client does not
+retry automatically. Submit one generation per request: if a custom GraphQL
+request contains several mutations, inspect every result before retrying it.
