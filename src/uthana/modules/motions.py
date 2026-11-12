@@ -432,7 +432,7 @@ class MotionsModule(_BaseModule):
         """Soft-delete a motion by ID. Returns the record with ``deleted`` set.
 
         Use ``restore`` to undo.
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(motion_id, {"deleted": True})
 
@@ -443,7 +443,7 @@ class MotionsModule(_BaseModule):
     async def restore(self, motion_id: str) -> Motion:
         """Restore a soft-deleted motion by ID. Returns the record with ``deleted`` cleared.
 
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(motion_id, {"deleted": False})
 
@@ -454,7 +454,7 @@ class MotionsModule(_BaseModule):
     async def rename(self, motion_id: str, new_name: str) -> Motion:
         """Rename a motion by ID. Returns the updated record.
 
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(motion_id, {"name": new_name})
 

@@ -603,21 +603,21 @@ async def test_lifecycle_uses_standard_backend_update(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["character", "motion"])
-async def test_restore_not_owned_raises(kind: str) -> None:
+async def test_restore_preserves_existing_write_denial(kind: str) -> None:
     seen = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(json.loads(request.content))
         error = {
-            "message": "Resource not found.",
-            "type": "ResourceNotFound",
+            "message": "This resource requires user access.",
+            "type": "UserAccessRequired",
         }
-        return httpx.Response(404, json={"data": None, "errors": [error]})
+        return httpx.Response(200, json={"data": None, "errors": [error]})
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
-    with pytest.raises(UthanaError, match="Resource not found") as error:
+    with pytest.raises(UthanaError, match="This resource requires user access") as error:
         await getattr(client, f"{kind}s").restore("x1")
-    assert error.value.status_code == 404
+    assert error.value.kind == "graphql"
     client.close()
 
     assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False}

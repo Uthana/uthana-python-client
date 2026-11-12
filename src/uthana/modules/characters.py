@@ -497,7 +497,7 @@ class CharactersModule(_BaseModule):
     async def rename(self, character_id: str, name: str) -> Character:
         """Rename a character by ID. Returns the updated record.
 
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(character_id, {"name": name})
 
@@ -509,7 +509,7 @@ class CharactersModule(_BaseModule):
         """Soft-delete a character by ID. Returns the record with ``deleted`` set.
 
         Motions do not belong to a character and are kept. Use ``restore`` to undo.
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(character_id, {"deleted": True})
 
@@ -520,7 +520,7 @@ class CharactersModule(_BaseModule):
     async def restore(self, character_id: str) -> Character:
         """Restore a soft-deleted character by ID. Returns the record with ``deleted`` cleared.
 
-        The backend refuses assets outside your organization without changing anything.
+        The account's existing API write permissions apply.
         """
         return await self._update(character_id, {"deleted": False})
 
