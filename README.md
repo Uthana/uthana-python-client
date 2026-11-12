@@ -410,8 +410,6 @@ async def manage_characters():
     deleted = await uthana_client.characters.delete(result.character["id"])
     print(deleted["deleted"])  # deletion timestamp
     await uthana_client.characters.restore(result.character["id"])
-    # Restore an asset owned by your organization.
-    await uthana_client.characters.restore(result.character["id"])
 
 
 asyncio.run(manage_characters())
