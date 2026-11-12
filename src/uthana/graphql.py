@@ -319,27 +319,6 @@ mutation UpdateCharacter($character_id: String!, $name: String, $deleted: Boolea
 }
 """
 
-    # Same update, refused by the backend unless the caller's organization owns the character
-    # (admin accounts included). Needs a backend with the own_org_only argument.
-    UPDATE_CHARACTER_OWN_ORG = """
-mutation UpdateCharacterOwnOrg(
-    $character_id: String!, $name: String, $deleted: Boolean, $own_org_only: Boolean
-) {
-    update_character(
-        character_id: $character_id, name: $name, deleted: $deleted, own_org_only: $own_org_only
-    ) {
-        character {
-            id
-            name
-            org_id
-            created
-            updated
-            deleted
-        }
-    }
-}
-"""
-
     CREATE_MOTION_FROM_GLTF = """
 mutation create_motion_from_gltf(
     $gltf: String!, $motionName: String!, $characterId: String, $sourceMotionId: String
@@ -385,27 +364,6 @@ query LocomotionStyles {
     UPDATE_MOTION = """
 mutation UpdateMotion($motion_id: String!, $name: String, $deleted: Boolean) {
     update_motion(motion_id: $motion_id, name: $name, deleted: $deleted) {
-        motion {
-            id
-            name
-            org_id
-            created
-            updated
-            deleted
-        }
-    }
-}
-"""
-
-    # Same update, refused by the backend unless the caller's organization owns the motion
-    # (admin accounts included). Needs a backend with the own_org_only argument.
-    UPDATE_MOTION_OWN_ORG = """
-mutation UpdateMotionOwnOrg(
-    $motion_id: String!, $name: String, $deleted: Boolean, $own_org_only: Boolean
-) {
-    update_motion(
-        motion_id: $motion_id, name: $name, deleted: $deleted, own_org_only: $own_org_only
-    ) {
         motion {
             id
             name

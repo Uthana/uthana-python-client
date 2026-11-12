@@ -576,18 +576,18 @@ async def test_motion_lifecycle_uses_backend_argument_and_payload(
     "call,kind,expected_changes",
     [
         (
-            lambda c: c.characters.rename("x1", "Knight", own_org_only=True),
+            lambda c: c.characters.rename("x1", "Knight"),
             "character",
             {"name": "Knight"},
         ),
-        (lambda c: c.characters.delete("x1", own_org_only=True), "character", {"deleted": True}),
-        (lambda c: c.characters.restore("x1", own_org_only=True), "character", {"deleted": False}),
-        (lambda c: c.motions.rename("x1", "Wave", own_org_only=True), "motion", {"name": "Wave"}),
-        (lambda c: c.motions.delete("x1", own_org_only=True), "motion", {"deleted": True}),
-        (lambda c: c.motions.restore("x1", own_org_only=True), "motion", {"deleted": False}),
+        (lambda c: c.characters.delete("x1"), "character", {"deleted": True}),
+        (lambda c: c.characters.restore("x1"), "character", {"deleted": False}),
+        (lambda c: c.motions.rename("x1", "Wave"), "motion", {"name": "Wave"}),
+        (lambda c: c.motions.delete("x1"), "motion", {"deleted": True}),
+        (lambda c: c.motions.restore("x1"), "motion", {"deleted": False}),
     ],
 )
-async def test_lifecycle_own_org_only_sends_backend_argument(
+async def test_lifecycle_uses_standard_backend_update(
     call: Any, kind: str, expected_changes: Any
 ) -> None:
     client = _make_client()
@@ -596,8 +596,8 @@ async def test_lifecycle_own_org_only_sends_backend_argument(
     await call(client)
 
     query, variables = client._graphql.call_args[0][:2]
-    assert "own_org_only: $own_org_only" in query
-    assert variables == {f"{kind}_id": "x1", **expected_changes, "own_org_only": True}
+    assert "own_org_only" not in query
+    assert variables == {f"{kind}_id": "x1", **expected_changes}
     assert client._graphql.call_args.kwargs["path"] == f"update_{kind}.{kind}"
 
 
@@ -629,10 +629,10 @@ async def test_restore_not_owned_raises(kind: str) -> None:
 
     client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handler))
     with pytest.raises(UthanaError, match="does not belong to your organization"):
-        await getattr(client, f"{kind}s").restore("x1", own_org_only=True)
+        await getattr(client, f"{kind}s").restore("x1")
     client.close()
 
-    assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False, "own_org_only": True}
+    assert seen[0]["variables"] == {f"{kind}_id": "x1", "deleted": False}
 
 
 @pytest.mark.asyncio
