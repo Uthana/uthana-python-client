@@ -45,13 +45,12 @@ jobs:
           print(m.group(1))
           ")
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          if curl -sf "https://pypi.org/pypi/uthana/${VERSION}/json" > /dev/null; then
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "Version ${VERSION} is already on PyPI — skipping release."
-          else
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Version ${VERSION} is not yet on PyPI — will release."
-          fi
+          STATUS=$(curl --silent --show-error --retry 3 --output /dev/null --write-out '%{http_code}' "https://pypi.org/pypi/uthana/${VERSION}/json")
+          case "$STATUS" in
+            200) echo "should_release=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "should_release=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "PyPI version check failed with HTTP $STATUS" >&2; exit 1 ;;
+          esac
 
       - name: Run tests
         if: steps.detect.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
