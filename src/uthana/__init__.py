@@ -3,6 +3,11 @@
 """Uthana Python client for the Uthana API."""
 
 from .client import Client, Uthana
+from .controlled_locomotion import (
+    ControlledLocomotionPlan,
+    ControlledLocomotionResult,
+    normalize_controlled_locomotion_plan,
+)
 from .file_formats import detect_file_format
 from .stitch import (
     MotionStep,
@@ -35,6 +40,10 @@ from .types import (
 )
 
 __all__ = [
+    "ControlledLocomotionPlan",
+    "ControlledLocomotionResult",
+    "controlled_locomotion_options",
+    "normalize_controlled_locomotion_plan",
     "Character",
     "CharacterPreviewResult",
     "Client",

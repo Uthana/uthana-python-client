@@ -11,6 +11,11 @@ from urllib.parse import quote
 
 import httpx
 
+from ..controlled_locomotion import (
+    SUPPORTED_CHARACTERS,
+    ControlledLocomotionPlan,
+    normalize_controlled_locomotion_plan,
+)
 from ..graphql import q
 from ..stitch import (
     StitchInput,
@@ -21,6 +26,7 @@ from ..stitch import (
 )
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
+    Job,
     Motion,
     OutputFormat,
     RobotFormat,
@@ -590,6 +596,51 @@ class MotionsModule(_BaseModule):
                 source_motion_id=source_motion_id,
             )
         )
+
+    async def get_controlled_locomotion_options(self) -> dict[str, object]:
+        """Read enabled state, supported characters, styles and limits from the backend."""
+        options = await self._client._graphql(
+            q.CONTROLLED_LOCOMOTION_OPTIONS, path="controlled_locomotion_options"
+        )
+        if not isinstance(options, dict) or type(options.get("enabled")) is not bool:
+            raise UthanaError(502, "Controlled locomotion discovery returned invalid options")
+        return options
+
+    def get_controlled_locomotion_options_sync(self) -> dict[str, object]:
+        """Read backend controlled locomotion options synchronously."""
+        return asyncio.run(self.get_controlled_locomotion_options())
+
+    async def create_controlled_locomotion(
+        self, character_id: str, *, plan: ControlledLocomotionPlan
+    ) -> Job:
+        """Submit a path plan once and return its job. Poll with jobs.get.
+
+        A FINISHED job may contain constraints_not_met, not a saved motion. Retain
+        the job ID and inspect its result before previewing or downloading.
+        """
+        if character_id not in SUPPORTED_CHARACTERS:
+            raise ValueError("character_id must be supported by controlled locomotion")
+        normalized = normalize_controlled_locomotion_plan(plan)
+        job = await self._client._graphql(
+            q.CREATE_CONTROLLED_LOCOMOTION,
+            {"character_id": character_id, "plan": normalized},
+            path="create_controlled_locomotion_job.job",
+            return_type=Job,
+        )
+        if not isinstance(job, dict) or not isinstance(job.get("id"), str) or not job["id"].strip():
+            raise UthanaError(
+                502,
+                "Controlled locomotion returned no job ID and may have succeeded. "
+                "Inspect existing jobs before resubmitting.",
+                kind="uncertain",
+            )
+        return job
+
+    def create_controlled_locomotion_sync(
+        self, character_id: str, *, plan: ControlledLocomotionPlan
+    ) -> Job:
+        """Submit controlled locomotion synchronously; retain the returned job ID."""
+        return asyncio.run(self.create_controlled_locomotion(character_id, plan=plan))
 
     async def create_locomotion(
         self,
