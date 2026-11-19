@@ -9,13 +9,23 @@ import pytest
 
 from tests.test_modules import _make_client
 from uthana.controlled_locomotion import (
-    controlled_locomotion_options,
     normalize_controlled_locomotion_plan,
 )
 from uthana.graphql import q
 from uthana.types import UthanaError
 
-CASES = json.loads((Path(__file__).parent / "fixtures/controlled_locomotion.json").read_text())
+FIXTURE = json.loads((Path(__file__).parent / "fixtures/controlled_locomotion.json").read_text())
+CASES = [
+    dict(
+        case,
+        input={
+            k: v
+            for k, v in (FIXTURE["base_plan"] | case["overrides"]).items()
+            if k not in case.get("omit", [])
+        },
+    )
+    for case in FIXTURE["cases"]
+]
 PLAN = CASES[0]["input"]
 CHARACTER = "cH32hVsowEyB"
 
@@ -39,12 +49,6 @@ def test_nonfinite(value):
     plan["pace_changes"][0]["speed_mps"] = value
     with pytest.raises(ValueError):
         normalize_controlled_locomotion_plan(plan)
-
-
-def test_discovery_is_fresh():
-    options = controlled_locomotion_options()
-    options["styles"].clear()
-    assert controlled_locomotion_options()["styles"]
 
 
 async def test_submit_and_no_retry():

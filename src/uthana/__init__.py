@@ -6,7 +6,6 @@ from .client import Client, Uthana
 from .controlled_locomotion import (
     ControlledLocomotionPlan,
     ControlledLocomotionResult,
-    controlled_locomotion_options,
     normalize_controlled_locomotion_plan,
 )
 from .file_formats import detect_file_format

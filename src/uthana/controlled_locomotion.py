@@ -152,25 +152,3 @@ def normalize_controlled_locomotion_plan(value: object) -> ControlledLocomotionP
         "pace_changes": paces,
         "allow_slowing": True,
     }
-
-
-def controlled_locomotion_options() -> dict[str, object]:
-    """Return a fresh offline contract catalog, not deployment or account eligibility."""
-    return {
-        "supported_character_ids": list(SUPPORTED_CHARACTERS),
-        "styles": list(SUPPORTED_STYLES),
-        "units": ["metres", "character_heights"],
-        "min_points": 2,
-        "max_points": MAX_POINTS,
-        "min_speed_mps": MIN_SPEED_MPS,
-        "max_speed_mps": MAX_SPEED_MPS,
-        "max_coordinate": MAX_COORDINATE,
-        "min_segment_length": MIN_SEGMENT_LENGTH,
-        "max_pace_changes": MAX_POINTS,
-        "max_path_length_m": 12.0,
-        "max_duration_seconds": 20.0,
-        "allow_slowing_required": True,
-        "availability": "Requires an enabled backend and authorized character access",
-        "axes": "Fixed initial right/forward; start at origin and head forward",
-        "pace": "By smoothed-path progress, not elapsed time; ends with a stop",
-    }
