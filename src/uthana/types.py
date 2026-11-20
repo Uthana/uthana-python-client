@@ -108,6 +108,20 @@ class Character(TypedDict, total=False):
     deleted: str | None
 
 
+class _MotionAnnotation(TypedDict, total=False):
+    user_id: str | None
+    label_id: str | None
+    created: str | None
+
+
+class MotionFavorite(_MotionAnnotation, total=False):
+    updated: str | None
+
+
+class MotionRating(_MotionAnnotation, total=False):
+    score: int | None
+
+
 class Motion(TypedDict, total=False):
     """Motion object from motions.list or update_motion (rename/delete/restore)."""
 
@@ -118,7 +132,9 @@ class Motion(TypedDict, total=False):
     deleted: str | None
     assets: list[dict]
     org_id: str
-    tags: dict[str, object]
+    tags: dict[str, object] | list[str] | None
+    favorite: MotionFavorite | None
+    rating: MotionRating | None
 
 
 class Job(TypedDict, total=False):
