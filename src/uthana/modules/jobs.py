@@ -108,7 +108,15 @@ class JobsModule(_BaseModule):
                 job = await asyncio.wait_for(self.get(job_id), timeout=remaining)
             except asyncio.TimeoutError as exc:
                 raise timeout_error from exc
+            if not job:
+                raise UthanaError(404, f"Job {job_id} was not found or is not accessible")
             status = job.get("status")
+            if not isinstance(status, str) or not status.strip():
+                raise UthanaError(
+                    502,
+                    f"Job {job_id} returned no valid status; expected a nonempty status string",
+                    kind="invalid_response",
+                )
             if status == "FINISHED":
                 return job
             if status == "FAILED":

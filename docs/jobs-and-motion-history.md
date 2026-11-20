@@ -7,7 +7,7 @@ job = await client.jobs.wait(job_id, interval_seconds=5, timeout_seconds=300)
 # Or: client.jobs.wait_sync(job_id, interval_seconds=5, timeout_seconds=300)
 ```
 
-Intervals and deadlines are positive finite seconds. The interval defaults to five seconds; the deadline defaults to the client's read timeout or 120 seconds if that timeout is unbounded. A failed job raises `UthanaError` with status 500. An elapsed deadline, including during a slow read, raises status 408. That stops local polling, not the upstream job: keep the same job ID to resume. Transport and authorization errors propagate without retry. FINISHED means processing ended; inspect its result and visual quality separately.
+Intervals and deadlines are positive finite seconds. The interval defaults to five seconds; the deadline defaults to the client's read timeout or 120 seconds if that timeout is unbounded. A failed job raises `UthanaError` with status 500. An elapsed deadline, including during a slow read, raises status 408. That stops local polling, not the upstream job: keep the same job ID to resume. A missing or inaccessible job raises status 404 immediately. A missing or malformed status raises `kind="invalid_response"` instead of polling until timeout. Transport and authorization errors propagate without retry. FINISHED means processing ended; inspect its result and visual quality separately.
 
 ## Rating
 
