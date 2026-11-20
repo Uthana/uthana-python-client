@@ -14,7 +14,7 @@ finally:
     client.close()
 ```
 
-Use "like" or "dislike" to rate a motion, or None to clear your vote. Each favorite call sets a state; repeating it does not toggle. Clearing a vote is different from disliking the motion.
+Use "like" or "dislike" to rate a motion, or `None` to clear your vote.
 
 Async applications use `await client.motions.rate(id, value)`, `await client.motions.favorite(id)` and `await client.motions.unfavorite(id)`.
 
