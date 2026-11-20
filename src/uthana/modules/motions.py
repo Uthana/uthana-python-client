@@ -697,9 +697,14 @@ class MotionsModule(_BaseModule):
     async def rate(
         self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
     ) -> None:
-        """Rate a motion: 1 for thumbs up, 0 for thumbs down."""
+        """Save your whole-motion rating: 1 means like, 0 means dislike.
+
+        Only integer 0 and 1 are supported; 2 and None are invalid. Repeating a
+        score sets the same rating, rather than toggling it. The GraphQL API currently
+        has no operation to clear a rating. Omit label_id for ordinary ratings.
+        """
         if type(score) is not int or score not in (0, 1):
-            raise ValueError("Motion rating score must be 0 or 1")
+            raise ValueError("Motion rating score must be 0 or 1 (0=dislike, 1=like)")
         await self._client._graphql(
             q.RATE_MOTION, {"motion_id": motion_id, "score": score, "label_id": label_id}
         )
@@ -707,18 +712,21 @@ class MotionsModule(_BaseModule):
     def rate_sync(
         self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
     ) -> None:
-        """Rate a motion (sync)."""
+        """Save your rating (sync): 1 means like, 0 means dislike; None cannot clear it."""
         return asyncio.run(self.rate(motion_id, score, label_id=label_id))
 
     async def favorite(self, motion_id: str, favorite: bool) -> None:
-        """Set or unset a motion as favorite."""
-        if favorite:
-            await self._client._graphql(q.CREATE_MOTION_FAVORITE, {"motion_id": motion_id})
-        else:
-            await self._client._graphql(q.DELETE_MOTION_FAVORITE, {"motion_id": motion_id})
+        """Set your favorite state: True adds the motion, False removes it.
+
+        This sets a state rather than toggling it. Calling with True twice keeps
+        the motion favorited; reading MotionFavorite metadata changes nothing.
+        """
+        await self._client._graphql(
+            q.FAVORITE_MOTION, {"motion_id": motion_id, "favorite": favorite}
+        )
 
     def favorite_sync(self, motion_id: str, favorite: bool) -> None:
-        """Set or unset a motion as favorite (sync)."""
+        """Set your favorite state (sync): True adds it, False removes it; no toggle."""
         asyncio.run(self.favorite(motion_id, favorite))
 
     async def bake_with_changes(

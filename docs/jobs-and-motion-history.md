@@ -7,16 +7,20 @@ job = await client.jobs.wait(job_id, interval_seconds=5, timeout_seconds=300)
 # Or: client.jobs.wait_sync(job_id, interval_seconds=5, timeout_seconds=300)
 ```
 
-Intervals and deadlines are positive finite seconds. The interval defaults to five seconds; the deadline defaults to the client's read timeout or 120 seconds if that timeout is unbounded. A failed job raises `UthanaError` with status 500. An elapsed deadline, including during a slow read, raises status 408. That stops local polling, not the upstream job: keep the same job ID to resume. Transport and authorization errors propagate without retry. FINISHED means processing ended; inspect its result and visual quality separately.
+Intervals and deadlines are positive finite seconds. The interval defaults to five seconds; the deadline defaults to the client's read timeout or 120 seconds if that timeout is unbounded. A failed job raises `UthanaError` with status 500. An elapsed deadline, including during a slow read, raises status 408. That stops local polling, not the upstream job: keep the same job ID to resume. A missing or inaccessible job raises status 404 immediately. A missing or malformed status raises `kind="invalid_response"` instead of polling until timeout. Transport and authorization errors propagate without retry. FINISHED means processing ended; inspect its result and visual quality separately.
 
 ## Rating
 
 ```python
 await client.motions.rate(motion_id, 1)  # thumbs up; use 0 for thumbs down
-client.motions.rate_sync(motion_id, 0, label_id=label_id)
+client.motions.rate_sync(motion_id, 0)
 ```
 
-Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. The optional label associates the rating with that label. Rating returns no value and does not generate motion.
+A score of 1 means like/thumbs up; 0 means dislike/thumbs down. Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. This saves the authenticated user's rating for the entire motion. Rating returns no value and does not generate motion. A score of 2 is invalid. Clearing a rating with None is not supported by the current API; an absent rating is distinct from a dislike.
+
+### Advanced annotation workflows
+
+The optional `label_id` parameter remains available for existing integrations that rate a particular motion annotation. It is an internal annotation identifier; omit it for ordinary whole-motion ratings.
 
 ## Download history
 
