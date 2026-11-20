@@ -18,7 +18,7 @@ await client.motions.rate(motion_id, None)  # clear your whole-motion vote
 client.motions.rate_sync(motion_id, "like")
 ```
 
-Use "like" or "dislike" to rate a motion, or None to clear your vote. The client handles the API request. Clearing your vote is different from disliking the motion.
+Use "like" or "dislike" to rate a motion, or `None` to clear your vote.
 
 ### Advanced annotation workflows
 
