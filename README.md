@@ -679,6 +679,6 @@ retry automatically. Submit one generation per request: if a custom GraphQL
 request contains several mutations, inspect every result before retrying it.
 
 For server-side asset search, ordering, and cursor pagination, see [Find characters and motions](docs/pagination.md).
-See [Jobs, ratings and download history](docs/jobs-and-motion-history.md) for known-job polling and motion feedback/history helpers.
+See [Jobs and download history](docs/jobs-and-motion-history.md) for known-job polling and download history.
 
 See [Motion feedback](docs/motion-feedback.md) for readable votes, clearing and explicit favorites.
