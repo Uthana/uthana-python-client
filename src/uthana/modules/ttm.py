@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import cast
 
 from ..graphql import q
@@ -16,6 +17,7 @@ from ..types import (
     TtmJobModelType,
     TtmModelType,
     UthanaCharacters,
+    UthanaError,
 )
 from ..utils import normalize_model_name
 from ._base import _BaseModule
@@ -96,19 +98,36 @@ class TtmModule(_BaseModule):
         prove the library lacks a better clip.
         """
         variables = {"prompt": prompt, "character_id": character_id}
-        data = await self._client._graphql(
+        data: object = await self._client._graphql(
             q.LIBRARY_SEARCH, variables, path="create_text_to_motion"
         )
-        motion = data["motion"]
-        tags = motion.get("tags") or {}
-        score = tags.get("Distance") if isinstance(tags, dict) else None
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
-            score = None
+        motion = data.get("motion") if isinstance(data, dict) else None
+        motion_id = motion.get("id") if isinstance(motion, dict) else None
+        if not isinstance(motion_id, str) or not motion_id.strip():
+            raise UthanaError(
+                502,
+                "Library copy returned no motion ID and may have succeeded. "
+                "Inspect existing work before resubmitting.",
+                kind="uncertain",
+            )
+        # A valid ID establishes the result; optional malformed metadata stays unknown.
+        name = motion.get("name") if isinstance(motion, dict) else None
+        tags = motion.get("tags") if isinstance(motion, dict) else None
+        raw_score = tags.get("Distance") if isinstance(tags, dict) else None
+        score = None
+        if not isinstance(raw_score, bool) and isinstance(raw_score, (int, float)):
+            try:
+                numeric_score = float(raw_score)
+            except OverflowError:
+                pass
+            else:
+                if math.isfinite(numeric_score):
+                    score = numeric_score
         return LibrarySearchResult(
             character_id=character_id if character_id is not None else UthanaCharacters.tar,
-            motion_id=motion["id"],
-            name=motion.get("name"),
-            match_score=None if score is None else float(score),
+            motion_id=motion_id,
+            name=name if isinstance(name, str) else None,
+            match_score=score,
         )
 
     def library_search_sync(
