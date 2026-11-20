@@ -607,13 +607,15 @@ class MotionsModule(_BaseModule):
         return asyncio.run(self.list_downloads())
 
     async def rate(
-        self, motion_id: str, score: MotionRatingValue, *, label_id: str | None = None
+        self,
+        motion_id: str,
+        score: MotionRatingValue | Literal[0, 1],
+        *,
+        label_id: str | None = None,
     ) -> None:
-        """Save your rating: "like" or 1, "dislike" or 0, or None to clear it.
+        """Save "like" or "dislike", or pass None to clear your vote.
 
-        Clearing applies to the whole motion and requires the clear_motion_rating
-        API mutation. Existing numeric scores and annotation ratings remain supported.
-        Setting a rating or favorite never toggles it or submits generation.
+        Clearing applies to the whole motion; omit label_id when clearing.
         """
         if score is None:
             if label_id is not None:
@@ -632,16 +634,20 @@ class MotionsModule(_BaseModule):
         numeric_score = {"like": 1, "dislike": 0}.get(score) if isinstance(score, str) else score
         if type(numeric_score) is not int or numeric_score not in (0, 1):
             raise ValueError(
-                "Motion rating score must be 0 or 1 (0=dislike, 1=like), 'like', 'dislike', or None"
+                "Motion rating score must be 'like', 'dislike', or None to clear your vote"
             )
         await self._client._graphql(
             q.RATE_MOTION, {"motion_id": motion_id, "score": numeric_score, "label_id": label_id}
         )
 
     def rate_sync(
-        self, motion_id: str, score: MotionRatingValue, *, label_id: str | None = None
+        self,
+        motion_id: str,
+        score: MotionRatingValue | Literal[0, 1],
+        *,
+        label_id: str | None = None,
     ) -> None:
-        """Save your rating (sync): "like"/1, "dislike"/0, or None to clear it."""
+        """Save "like" or "dislike", or pass None to clear your vote (sync)."""
         return asyncio.run(self.rate(motion_id, score, label_id=label_id))
 
     async def favorite(self, motion_id: str, favorite: bool = True) -> None:

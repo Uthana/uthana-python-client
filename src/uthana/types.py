@@ -120,7 +120,7 @@ class MotionFavorite(TypedDict):
     updated: str | None
 
 
-MotionRatingValue = Literal["like", "dislike", 0, 1] | None
+MotionRatingValue = Literal["like", "dislike"] | None
 
 
 class MotionRating(TypedDict):
