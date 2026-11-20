@@ -140,3 +140,26 @@ async def test_clear_with_malformed_envelope_is_uncertain_and_not_retried(body: 
         assert len(requests) == 1
     finally:
         client.close()
+
+
+@pytest.mark.parametrize("is_favorite", [True, False])
+@pytest.mark.asyncio
+async def test_favorite_requires_confirmation_without_retrying(is_favorite: bool) -> None:
+    for data in [
+        *({"favorite_motion": result} for result in CONTRACT["invalid_favorite_results"]),
+        {},
+    ]:
+        calls: list[httpx.Request] = []
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(200, json={"data": data})
+
+        client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handle))
+        try:
+            with pytest.raises(UthanaError) as error:
+                await client.motions.favorite("m1", is_favorite)
+            assert error.value.kind == "uncertain"
+            assert len(calls) == 1
+        finally:
+            client.close()
