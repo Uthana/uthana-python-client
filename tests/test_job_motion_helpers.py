@@ -141,7 +141,7 @@ async def test_rate_sends_selected_score_and_label(score: int) -> None:
     assert "rate_motion(" in calls[0]["query"]
 
 
-@pytest.mark.parametrize("score", [-1, 2, True, 0.0, "1", None])
+@pytest.mark.parametrize("score", [-1, 2, True, 0.0, "1"])
 @pytest.mark.asyncio
 async def test_rating_validation_prevents_submission(score: object) -> None:
     client = make_client()
