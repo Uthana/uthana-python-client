@@ -44,6 +44,39 @@ async def test_wait_reports_failure_without_resubmitting() -> None:
         client.close()
 
 
+@pytest.mark.parametrize(
+    "job,status_code",
+    [
+        (None, 404),
+        ({}, 404),
+        ({"id": "j1"}, 502),
+        ({"status": None}, 502),
+        ({"status": 42}, 502),
+        ({"status": True}, 502),
+        ({"status": ""}, 502),
+        ({"status": " "}, 502),
+    ],
+)
+@pytest.mark.asyncio
+async def test_wait_stops_on_missing_job_or_invalid_status(job: object, status_code: int) -> None:
+    calls: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json={"data": {"job": job}})
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handle))
+    try:
+        with pytest.raises(UthanaError, match="Job j1") as error:
+            await client.jobs.wait("j1", timeout_seconds=1)
+        assert error.value.status_code == status_code
+        if status_code == 502:
+            assert error.value.kind == "invalid_response"
+        assert len(calls) == 1
+    finally:
+        client.close()
+
+
 @pytest.mark.asyncio
 async def test_wait_deadline_cancels_a_slow_read_and_keeps_job_identity() -> None:
     client = make_client()
