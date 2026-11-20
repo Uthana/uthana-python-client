@@ -108,18 +108,28 @@ class Character(TypedDict, total=False):
     deleted: str | None
 
 
-class _MotionAnnotation(TypedDict):
-    user_id: str | None
-    label_id: str | None
+class MotionFavorite(TypedDict):
+    """The authenticated user's whole-motion favorite metadata.
+
+    A record means the motion is favorited; ``Motion.favorite`` is None otherwise.
+    ``motions.favorite(id, True)`` keeps it favorited even when called twice.
+    ``motions.favorite(id, False)`` removes it; these calls do not toggle.
+    """
+
     created: str | None
-
-
-class MotionFavorite(_MotionAnnotation):
     updated: str | None
 
 
-class MotionRating(_MotionAnnotation):
-    score: int | None
+class MotionRating(TypedDict):
+    """The authenticated user's whole-motion rating and timestamps.
+
+    ``score`` is 1 for like/thumbs up or 0 for dislike/thumbs down; 2 is invalid.
+    ``Motion.rating`` is None when the user has not rated the motion.
+    """
+
+    score: Literal[0, 1]
+    created: str | None
+    updated: str | None
 
 
 class Motion(TypedDict, total=False):
