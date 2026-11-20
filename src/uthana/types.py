@@ -118,7 +118,25 @@ class Motion(TypedDict, total=False):
     deleted: str | None
     assets: list[dict]
     org_id: str
-    tags: dict[str, object]
+    tags: dict[str, object] | list[str] | None
+
+
+AssetSource = Literal["all", "mine", "uthana"]
+AssetOrder = Literal["created_desc", "created_asc", "name_asc", "name_desc"]
+
+
+class CharacterPage(TypedDict):
+    """One ordered page of characters; a null cursor marks the end."""
+
+    items: list[Character]
+    next_cursor: str | None
+
+
+class MotionPage(TypedDict):
+    """One ordered page of motions; a null cursor marks the end."""
+
+    items: list[Motion]
+    next_cursor: str | None
 
 
 class Job(TypedDict, total=False):

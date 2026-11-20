@@ -677,3 +677,5 @@ Its `response_data` contains the GraphQL error with `code="job_limit_exceeded"`.
 Wait for an existing job to finish before submitting again. The client does not
 retry automatically. Submit one generation per request: if a custom GraphQL
 request contains several mutations, inspect every result before retrying it.
+
+For server-side asset search, ordering, and cursor pagination, see [Find characters and motions](docs/pagination.md).
