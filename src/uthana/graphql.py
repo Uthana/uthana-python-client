@@ -446,8 +446,8 @@ query GetMotion($motion_id: String!) {
         created
         updated
         tags
-        favorite { user_id label_id created updated }
-        rating { user_id label_id score created updated }
+        favorite { created updated }
+        rating { score created updated }
         assets { id uid type sha256 metadata }
     }
 }

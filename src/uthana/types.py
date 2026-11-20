@@ -108,18 +108,18 @@ class Character(TypedDict, total=False):
     deleted: str | None
 
 
-class _MotionAnnotation(TypedDict):
-    user_id: str | None
-    label_id: str | None
+class MotionFavorite(TypedDict):
+    """The authenticated user's whole-motion favorite metadata."""
+
     created: str | None
-
-
-class MotionFavorite(_MotionAnnotation):
     updated: str | None
 
 
-class MotionRating(_MotionAnnotation):
+class MotionRating(TypedDict):
+    """The authenticated user's whole-motion rating and timestamps."""
+
     score: int | None
+    created: str | None
     updated: str | None
 
 

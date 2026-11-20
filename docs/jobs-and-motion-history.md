@@ -13,10 +13,14 @@ Intervals and deadlines are positive finite seconds. The interval defaults to fi
 
 ```python
 await client.motions.rate(motion_id, 1)  # thumbs up; use 0 for thumbs down
-client.motions.rate_sync(motion_id, 0, label_id=label_id)
+client.motions.rate_sync(motion_id, 0)
 ```
 
-Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. The optional label associates the rating with that label. Rating returns no value and does not generate motion.
+Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. This saves the authenticated user's rating for the entire motion. Rating returns no value and does not generate motion.
+
+### Advanced annotation workflows
+
+The optional `label_id` parameter remains available for existing integrations that rate a particular motion annotation. It is an internal annotation identifier; omit it for ordinary whole-motion ratings.
 
 ## Download history
 
