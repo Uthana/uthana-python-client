@@ -112,12 +112,15 @@ class MotionFavorite(TypedDict):
     """The authenticated user's whole-motion favorite metadata.
 
     A record means the motion is favorited; ``Motion.favorite`` is None otherwise.
-    ``motions.favorite(id, True)`` keeps it favorited even when called twice.
-    ``motions.favorite(id, False)`` removes it; these calls do not toggle.
+    ``motions.favorite(id)`` keeps it favorited even when called twice.
+    ``motions.unfavorite(id)`` removes it; these calls do not toggle.
     """
 
     created: str | None
     updated: str | None
+
+
+MotionRatingValue = Literal["like", "dislike", 0, 1] | None
 
 
 class MotionRating(TypedDict):
