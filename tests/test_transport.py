@@ -225,15 +225,18 @@ async def test_graphql_errors_preserve_full_envelope_for_submission_classificati
     assert error.value.status_code == 400
 
 
+@pytest.mark.parametrize(
+    "query,kind", [("query{}", "invalid_response"), ("mutation{}", "uncertain")]
+)
 @pytest.mark.parametrize("body", [b"not-json", b"\xff", b"[]", b"null", b"{}", b'{"data":null}'])
-async def test_invalid_graphql_response_is_structured(body):
+async def test_invalid_graphql_response_is_structured(body: bytes, query: str, kind: str) -> None:
     client = make_client(lambda request: httpx.Response(200, content=body))
     try:
         with pytest.raises(UthanaError) as error:
-            await client._graphql("query{}")
+            await client._graphql(query)
     finally:
         client.close()
-    assert error.value.kind == "invalid_response"
+    assert error.value.kind == kind
     assert error.value.response_data is None
 
 
