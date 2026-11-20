@@ -139,6 +139,19 @@ class MotionPage(TypedDict):
     next_cursor: str | None
 
 
+class _MotionDownloadFields(TypedDict):
+    """One download-history entry; seconds are distinct from PAYG charges."""
+
+    motion_id: str
+    character_id: str
+    secs: float
+
+
+class MotionDownloadRecord(_MotionDownloadFields, total=False):
+    created: str | None
+    motion: Motion | None
+
+
 class Job(TypedDict, total=False):
     """Job object from jobs.get, jobs.list, or vtm.create. Poll until status is FINISHED or FAILED.
 
