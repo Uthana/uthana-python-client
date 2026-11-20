@@ -147,7 +147,7 @@ async def test_rating_validation_prevents_submission(score: object) -> None:
     client = make_client()
     client._graphql = AsyncMock()
     try:
-        with pytest.raises(ValueError, match="score must be 0 or 1"):
+        with pytest.raises(ValueError, match="score must be 'like', 'dislike', or None"):
             await client.motions.rate("m1", score)
         client._graphql.assert_not_called()
     finally:
@@ -173,3 +173,44 @@ def test_download_history_and_rating_sync_wrappers() -> None:
         client.close()
     assert "motion_downloads" in queries[0]
     assert "rate_motion" in queries[1]
+
+
+@pytest.mark.parametrize("is_favorite", [True, False])
+@pytest.mark.asyncio
+async def test_favorite_sends_explicit_state(is_favorite: bool) -> None:
+    calls: list[dict] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(
+            200, json={"data": {"favorite_motion": {"__typename": "FavoriteMotion"}}}
+        )
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handle))
+    try:
+        assert await client.motions.favorite("m1", is_favorite) is None
+    finally:
+        client.close()
+    assert len(calls) == 1
+    assert calls[0]["variables"] == {"motion_id": "m1", "favorite": is_favorite}
+    assert "favorite_motion(" in calls[0]["query"]
+    assert "motion_favorite {" not in calls[0]["query"]
+
+
+def test_favorite_sync_repeats_the_state_without_toggling() -> None:
+    calls: list[dict] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(
+            200, json={"data": {"favorite_motion": {"__typename": "FavoriteMotion"}}}
+        )
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handle))
+    try:
+        client.motions.favorite_sync("m1", True)
+        client.motions.favorite_sync("m1", True)
+        client.motions.favorite_sync("m1", False)
+    finally:
+        client.close()
+    assert [call["variables"]["favorite"] for call in calls] == [True, True, False]

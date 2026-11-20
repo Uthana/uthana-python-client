@@ -175,6 +175,12 @@ mutation RateMotion($motion_id: String!, $label_id: String, $score: Int!) {
 }
 """
 
+    CLEAR_MOTION_RATING = """
+mutation ClearMotionRating($motion_id: String!) {
+    clear_motion_rating(motion_id: $motion_id) { ok }
+}
+"""
+
     GET_MOTION_DOWNLOADS = """
 query MotionDownloads {
     motion_downloads {
@@ -420,19 +426,11 @@ mutation UpdateMotion($motion_id: String!, $name: String, $deleted: Boolean) {
 }
 """
 
-    CREATE_MOTION_FAVORITE = """
-mutation create_motion_favorite($motion_id: String!) {
-    create_motion_favorite(motion_id: $motion_id) {
-        id
-        motion_id
-    }
-}
-"""
-
-    DELETE_MOTION_FAVORITE = """
-mutation delete_motion_favorite($motion_id: String!) {
-    delete_motion_favorite(motion_id: $motion_id) {
-        id
+    # Unfavoriting can leave no record to return, so request only the payload type.
+    FAVORITE_MOTION = """
+mutation FavoriteMotion($motion_id: String!, $favorite: Boolean!) {
+    favorite_motion(motion_id: $motion_id, favorite: $favorite) {
+        __typename
     }
 }
 """
@@ -443,6 +441,11 @@ query GetMotion($motion_id: String!) {
         id
         name
         org_id
+        created
+        updated
+        tags
+        favorite { created updated }
+        rating { score created updated }
         assets { id uid type sha256 metadata }
     }
 }

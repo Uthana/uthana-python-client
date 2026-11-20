@@ -26,6 +26,7 @@ from ..types import (
     Motion,
     MotionDownloadRecord,
     MotionPage,
+    MotionRatingValue,
     OutputFormat,
     RobotFormat,
     TextToMotionResult,
@@ -606,31 +607,80 @@ class MotionsModule(_BaseModule):
         return asyncio.run(self.list_downloads())
 
     async def rate(
-        self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
+        self,
+        motion_id: str,
+        score: MotionRatingValue | Literal[0, 1],
+        *,
+        label_id: str | None = None,
     ) -> None:
-        """Rate a motion: 1 for thumbs up, 0 for thumbs down."""
-        if type(score) is not int or score not in (0, 1):
-            raise ValueError("Motion rating score must be 0 or 1")
+        """Save "like" or "dislike", or pass None to clear your vote.
+
+        Clearing applies to the whole motion; omit label_id when clearing.
+        """
+        if score is None:
+            if label_id is not None:
+                raise ValueError("Clearing a rating applies to the whole motion; omit label_id")
+            result: object = await self._client._graphql(
+                q.CLEAR_MOTION_RATING, {"motion_id": motion_id}, path="clear_motion_rating"
+            )
+            if not isinstance(result, dict) or result.get("ok") is not True:
+                raise UthanaError(
+                    502,
+                    "Clearing the rating returned no confirmation. Inspect the motion's "
+                    "current rating before trying again.",
+                    kind="uncertain",
+                )
+            return
+        numeric_score = {"like": 1, "dislike": 0}.get(score) if isinstance(score, str) else score
+        if type(numeric_score) is not int or numeric_score not in (0, 1):
+            raise ValueError(
+                "Motion rating score must be 'like', 'dislike', or None to clear your vote"
+            )
         await self._client._graphql(
-            q.RATE_MOTION, {"motion_id": motion_id, "score": score, "label_id": label_id}
+            q.RATE_MOTION, {"motion_id": motion_id, "score": numeric_score, "label_id": label_id}
         )
 
     def rate_sync(
-        self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
+        self,
+        motion_id: str,
+        score: MotionRatingValue | Literal[0, 1],
+        *,
+        label_id: str | None = None,
     ) -> None:
-        """Rate a motion (sync)."""
+        """Save "like" or "dislike", or pass None to clear your vote (sync)."""
         return asyncio.run(self.rate(motion_id, score, label_id=label_id))
 
-    async def favorite(self, motion_id: str, favorite: bool) -> None:
-        """Set or unset a motion as favorite."""
-        if favorite:
-            await self._client._graphql(q.CREATE_MOTION_FAVORITE, {"motion_id": motion_id})
-        else:
-            await self._client._graphql(q.DELETE_MOTION_FAVORITE, {"motion_id": motion_id})
+    async def favorite(self, motion_id: str, favorite: bool = True) -> None:
+        """Add the motion to your favorites. Repeating the call keeps it favorited.
 
-    def favorite_sync(self, motion_id: str, favorite: bool) -> None:
-        """Set or unset a motion as favorite (sync)."""
+        The existing favorite(id, False) form remains supported for removal.
+        """
+        if type(favorite) is not bool:
+            raise ValueError("Favorite state must be True or False")
+        result: object = await self._client._graphql(
+            q.FAVORITE_MOTION,
+            {"motion_id": motion_id, "favorite": favorite},
+            path="favorite_motion",
+        )
+        if not isinstance(result, dict) or result.get("__typename") != "FavoriteMotion":
+            raise UthanaError(
+                502,
+                "Changing the favorite returned no confirmation. "
+                "Check your favorites before trying again.",
+                kind="uncertain",
+            )
+
+    def favorite_sync(self, motion_id: str, favorite: bool = True) -> None:
+        """Add a favorite (sync); passing False removes it for compatibility."""
         asyncio.run(self.favorite(motion_id, favorite))
+
+    async def unfavorite(self, motion_id: str) -> None:
+        """Remove the motion from your favorites; repeating the call is harmless."""
+        await self.favorite(motion_id, False)
+
+    def unfavorite_sync(self, motion_id: str) -> None:
+        """Remove the motion from your favorites (sync)."""
+        asyncio.run(self.unfavorite(motion_id))
 
     async def bake_with_changes(
         self,

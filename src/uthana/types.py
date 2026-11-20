@@ -108,6 +108,32 @@ class Character(TypedDict, total=False):
     deleted: str | None
 
 
+class MotionFavorite(TypedDict):
+    """The authenticated user's whole-motion favorite metadata.
+
+    A record means the motion is favorited; ``Motion.favorite`` is None otherwise.
+    ``motions.favorite(id)`` keeps it favorited even when called twice.
+    ``motions.unfavorite(id)`` removes it; these calls do not toggle.
+    """
+
+    created: str | None
+    updated: str | None
+
+
+MotionRatingValue = Literal["like", "dislike"] | None
+
+
+class MotionRating(TypedDict):
+    """The authenticated user's whole-motion rating and timestamps.
+
+    ``Motion.rating`` is None when the user has not rated the motion.
+    """
+
+    score: Literal[0, 1]
+    created: str | None
+    updated: str | None
+
+
 class Motion(TypedDict, total=False):
     """Motion object from motions.list or update_motion (rename/delete/restore)."""
 
@@ -119,6 +145,8 @@ class Motion(TypedDict, total=False):
     assets: list[dict]
     org_id: str
     tags: dict[str, object] | list[str] | None
+    favorite: MotionFavorite | None
+    rating: MotionRating | None
 
 
 AssetSource = Literal["all", "mine", "uthana"]
