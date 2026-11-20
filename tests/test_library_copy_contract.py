@@ -18,7 +18,7 @@ async def test_malformed_paid_results_remain_uncertain(payload: object) -> None:
     client._graphql = AsyncMock(return_value=payload)
     try:
         with pytest.raises(UthanaError) as error:
-            await client.ttm.library_search("walk")
+            await client.ttm.copy_from_library("walk")
         assert error.value.kind == "uncertain"
         client._graphql.assert_awaited_once()
     finally:
@@ -31,7 +31,7 @@ async def test_valid_copy_metadata(case: dict) -> None:
     client = Uthana("test", telemetry=False)
     client._graphql = AsyncMock(return_value=case["response"])
     try:
-        result = await client.ttm.library_search("walk")
+        result = await client.ttm.copy_from_library("walk")
         assert result.motion_id == case["motion_id"]
         assert result.name == case["name"]
         assert result.match_score == case["match_score"]
@@ -49,7 +49,7 @@ async def test_unusable_scores_are_unknown(tags: object) -> None:
     client = Uthana("test", telemetry=False)
     client._graphql = AsyncMock(return_value={"motion": {"id": "m1", "tags": tags}})
     try:
-        assert (await client.ttm.library_search("walk")).match_score is None
+        assert (await client.ttm.copy_from_library("walk")).match_score is None
         client._graphql.assert_awaited_once()
     finally:
         client.close()

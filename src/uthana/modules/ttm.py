@@ -85,7 +85,7 @@ class TtmModule(_BaseModule):
             ),
         )
 
-    async def library_search(
+    async def copy_from_library(
         self, prompt: str, *, character_id: str | None = None
     ) -> LibrarySearchResult:
         """Find the library motion that best matches a prompt and add it to your organization.
@@ -130,11 +130,23 @@ class TtmModule(_BaseModule):
             match_score=score,
         )
 
+    def copy_from_library_sync(
+        self, prompt: str, *, character_id: str | None = None
+    ) -> LibrarySearchResult:
+        """Find and copy the best-matching library motion (sync). Charged; see copy_from_library."""
+        return asyncio.run(self.copy_from_library(prompt, character_id=character_id))
+
+    async def library_search(
+        self, prompt: str, *, character_id: str | None = None
+    ) -> LibrarySearchResult:
+        """Compatibility alias for copy_from_library; this copies a motion and is charged."""
+        return await self.copy_from_library(prompt, character_id=character_id)
+
     def library_search_sync(
         self, prompt: str, *, character_id: str | None = None
     ) -> LibrarySearchResult:
-        """Find and copy the best-matching library motion (sync). Charged; see library_search."""
-        return asyncio.run(self.library_search(prompt, character_id=character_id))
+        """Compatibility alias for copy_from_library_sync; this copies a motion and is charged."""
+        return self.copy_from_library_sync(prompt, character_id=character_id)
 
     async def create_job(
         self,
