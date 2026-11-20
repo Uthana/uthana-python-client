@@ -443,6 +443,11 @@ query GetMotion($motion_id: String!) {
         id
         name
         org_id
+        created
+        updated
+        tags
+        favorite { user_id label_id created updated }
+        rating { user_id label_id score created }
         assets { id uid type sha256 metadata }
     }
 }
