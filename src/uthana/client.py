@@ -288,7 +288,17 @@ class Uthana:
         body = await self._request_bytes(
             "POST", self.graphql_url, max_bytes=response_limit, mutating=mutating, **kwargs
         )
-        result = self._parse_graphql_response(body)
+        try:
+            result = self._parse_graphql_response(body)
+        except UthanaError as error:
+            if mutating and error.kind == "invalid_response":
+                raise UthanaError(
+                    error.status_code,
+                    "The mutation returned an invalid response and may have succeeded. "
+                    "Inspect existing work before resubmitting.",
+                    kind="uncertain",
+                ) from error
+            raise
         data = result["data"]
         if path is not None:
             default = path_default if path_default is not None else {}
