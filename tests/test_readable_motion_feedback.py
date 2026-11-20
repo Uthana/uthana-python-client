@@ -121,3 +121,22 @@ async def test_invalid_favorite_state_never_writes(value: object) -> None:
         client._graphql.assert_not_awaited()
     finally:
         client.close()
+
+
+@pytest.mark.parametrize("body", [b"not-json", b"null", b"[]", b"{}", b'{"data": null}'])
+@pytest.mark.asyncio
+async def test_clear_with_malformed_envelope_is_uncertain_and_not_retried(body: bytes) -> None:
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, content=body)
+
+    client = Uthana("test", telemetry=False, transport=httpx.MockTransport(handle))
+    try:
+        with pytest.raises(UthanaError) as error:
+            await client.motions.rate("m1", None)
+        assert error.value.kind == "uncertain"
+        assert len(requests) == 1
+    finally:
+        client.close()
