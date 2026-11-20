@@ -108,17 +108,17 @@ class Character(TypedDict, total=False):
     deleted: str | None
 
 
-class _MotionAnnotation(TypedDict, total=False):
+class _MotionAnnotation(TypedDict):
     user_id: str | None
     label_id: str | None
     created: str | None
 
 
-class MotionFavorite(_MotionAnnotation, total=False):
+class MotionFavorite(_MotionAnnotation):
     updated: str | None
 
 
-class MotionRating(_MotionAnnotation, total=False):
+class MotionRating(_MotionAnnotation):
     score: int | None
 
 
