@@ -108,3 +108,16 @@ async def test_clear_rejects_annotation_selector_and_preserves_unsupported_serve
         client._graphql.assert_awaited_once()
     finally:
         client.close()
+
+
+@pytest.mark.parametrize("value", CONTRACT["invalid_favorites"])
+@pytest.mark.asyncio
+async def test_invalid_favorite_state_never_writes(value: object) -> None:
+    client = Uthana("test", telemetry=False)
+    client._graphql = AsyncMock()
+    try:
+        with pytest.raises(ValueError, match="Favorite state"):
+            await client.motions.favorite("m1", value)
+        client._graphql.assert_not_awaited()
+    finally:
+        client.close()

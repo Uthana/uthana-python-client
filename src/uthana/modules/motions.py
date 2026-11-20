@@ -738,6 +738,8 @@ class MotionsModule(_BaseModule):
 
         The existing favorite(id, False) form remains supported for removal.
         """
+        if type(favorite) is not bool:
+            raise ValueError("Favorite state must be True or False")
         await self._client._graphql(
             q.FAVORITE_MOTION, {"motion_id": motion_id, "favorite": favorite}
         )
