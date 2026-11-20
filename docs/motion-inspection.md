@@ -1,6 +1,6 @@
 # Inspect a motion
 
-`motions.get(id)` and `get_sync(id)` include record creation/update dates, saved tags, the caller's favorite/rating metadata and native asset metadata, matching the JS client lookup. Missing or inaccessible motions retain the existing error behavior.
+`motions.get(id)` and `get_sync(id)` include record creation/update dates, saved tags, the caller's favorite/rating metadata and native asset metadata. Missing or inaccessible motions retain the existing error behavior.
 
 ```python
 motion = await client.motions.get(motion_id)
@@ -10,4 +10,4 @@ if isinstance(tags, dict):
 print(motion.get("favorite"), motion.get("rating"))
 ```
 
-Tags can be a dictionary, a string array or null; inspect the type before using dictionary methods. Missing dates, labels and ratings remain unknown. A known zero rating means thumbs down. Asset metadata describes identity/timing, not visual quality, and reading it does not regenerate or modify the motion.
+Tags can be a dictionary, a string array or null; inspect the type before using dictionary methods. Missing dates, labels and ratings remain unknown. Favorite and rating records include creation/update times when present. A known zero rating means thumbs down. Asset metadata describes identity/timing, not visual quality, and reading it does not regenerate or modify the motion.

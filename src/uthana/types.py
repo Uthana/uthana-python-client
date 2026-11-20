@@ -120,6 +120,7 @@ class MotionFavorite(_MotionAnnotation):
 
 class MotionRating(_MotionAnnotation):
     score: int | None
+    updated: str | None
 
 
 class Motion(TypedDict, total=False):
