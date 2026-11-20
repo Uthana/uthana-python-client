@@ -9,13 +9,17 @@ from uthana import Uthana, UthanaError
 
 
 @pytest.mark.parametrize("kind", ["characters", "motions"])
+@pytest.mark.parametrize("tags", [{"Method": "VideoToMotion"}, ["Walk", "Slow"], None])
 @pytest.mark.asyncio
-async def test_paged_reads_continue_with_opaque_cursor(kind: str) -> None:
+async def test_paged_reads_continue_with_opaque_cursor(kind: str, tags: object) -> None:
     requests = []
     pages = [
         {"items": [{"id": "older", "name": "Walk", "created": None}], "next_cursor": "opaque+/="},
         {"items": [{"id": "oldest", "name": "Walk", "created": "2020-01-01"}], "next_cursor": None},
     ]
+
+    if kind == "motions":
+        pages[0]["items"][0]["tags"] = tags
 
     def handle(request: httpx.Request) -> httpx.Response:
         requests.append(json.loads(request.content))

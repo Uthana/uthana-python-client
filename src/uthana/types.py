@@ -118,7 +118,7 @@ class Motion(TypedDict, total=False):
     deleted: str | None
     assets: list[dict]
     org_id: str
-    tags: dict[str, object]
+    tags: dict[str, object] | list[str] | None
 
 
 AssetSource = Literal["all", "mine", "uthana"]
