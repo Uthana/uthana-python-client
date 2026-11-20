@@ -11,7 +11,10 @@ from .stitch import (
     StitchResult,
 )
 from .types import (
+    AssetOrder,
+    AssetSource,
     Character,
+    CharacterPage,
     CharacterPreviewResult,
     CreateCharacterResult,
     CreateFromGeneratedImageResult,
@@ -21,6 +24,7 @@ from .types import (
     LibrarySearchResult,
     ModelType,
     Motion,
+    MotionPage,
     Org,
     RobotFormat,
     TextToMotionResult,
@@ -35,6 +39,10 @@ from .types import (
 )
 
 __all__ = [
+    "AssetOrder",
+    "AssetSource",
+    "CharacterPage",
+    "MotionPage",
     "Character",
     "CharacterPreviewResult",
     "Client",

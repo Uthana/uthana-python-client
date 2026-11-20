@@ -16,7 +16,10 @@ import httpx
 from ..graphql import q
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
+    AssetOrder,
+    AssetSource,
     Character,
+    CharacterPage,
     CharacterPreviewResult,
     CreateCharacterResult,
     CreateFromGeneratedImageResult,
@@ -447,6 +450,56 @@ class CharactersModule(_BaseModule):
     def list_sync(self) -> List[Character]:
         """List all characters for the authenticated user (sync)."""
         return asyncio.run(self.list())
+
+    async def list_paged(
+        self,
+        *,
+        query: str | None = None,
+        source: AssetSource | None = None,
+        order: AssetOrder | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> CharacterPage:
+        """Search characters by name with server-side ordering and cursor pagination.
+
+        Defaults: all sources, newest first, 20 items. ``mine`` means your organization;
+        ``uthana`` means shared examples. Pass ``next_cursor`` with the same filters to
+        continue; null ends the results. Requires the ``characters_paged`` API field.
+        Existing ``list`` calls retain their behavior. Invalid options raise API errors.
+        """
+        variables = {
+            "query": query,
+            "source": source,
+            "order": order,
+            "limit": limit,
+            "cursor": cursor,
+        }
+        return await self._client._graphql(
+            q.LIST_CHARACTERS_PAGED,
+            {key: value for key, value in variables.items() if value is not None},
+            path="characters_paged",
+            return_type=CharacterPage,
+        )
+
+    def list_paged_sync(
+        self,
+        *,
+        query: str | None = None,
+        source: AssetSource | None = None,
+        order: AssetOrder | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> CharacterPage:
+        """Search characters with server-side ordering and pagination (sync)."""
+        return asyncio.run(
+            self.list_paged(
+                query=query,
+                source=source,
+                order=order,
+                limit=limit,
+                cursor=cursor,
+            )
+        )
 
     async def get(self, character_id: str) -> Character:
         """Get one live character by ID, including its owning ``org_id``.

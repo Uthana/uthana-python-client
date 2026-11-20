@@ -21,7 +21,10 @@ from ..stitch import (
 )
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
+    AssetOrder,
+    AssetSource,
     Motion,
+    MotionPage,
     OutputFormat,
     RobotFormat,
     TextToMotionResult,
@@ -50,6 +53,60 @@ class MotionsModule(_BaseModule):
     def list_sync(self) -> List[Motion]:
         """List all motions for the authenticated user (sync)."""
         return asyncio.run(self.list())
+
+    async def list_paged(
+        self,
+        *,
+        query: str | None = None,
+        source: AssetSource | None = None,
+        order: AssetOrder | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+        method: str | None = None,
+    ) -> MotionPage:
+        """Search motions by name with server-side ordering and cursor pagination.
+
+        Defaults: all sources, newest first, 20 items. ``mine`` means your organization;
+        ``uthana`` means shared examples. Pass ``next_cursor`` with the same filters to
+        continue; null ends the results. Requires the ``motions_paged`` API field.
+        Existing ``list`` calls retain their behavior. Invalid options raise API errors.
+        """
+        variables = {
+            "query": query,
+            "source": source,
+            "order": order,
+            "limit": limit,
+            "cursor": cursor,
+            "method": method,
+        }
+        return await self._client._graphql(
+            q.LIST_MOTIONS_PAGED,
+            {key: value for key, value in variables.items() if value is not None},
+            path="motions_paged",
+            return_type=MotionPage,
+        )
+
+    def list_paged_sync(
+        self,
+        *,
+        query: str | None = None,
+        source: AssetSource | None = None,
+        order: AssetOrder | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+        method: str | None = None,
+    ) -> MotionPage:
+        """Search motions with server-side ordering and pagination (sync)."""
+        return asyncio.run(
+            self.list_paged(
+                query=query,
+                source=source,
+                order=order,
+                limit=limit,
+                cursor=cursor,
+                method=method,
+            )
+        )
 
     async def get(self, motion_id: str) -> Motion:
         """Get a motion and its asset metadata, including native bundle information."""
