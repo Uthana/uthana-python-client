@@ -51,5 +51,16 @@
     "false",
     {},
     []
+  ],
+  "invalid_favorite_results": [
+    null,
+    {},
+    false,
+    {
+      "__typename": null
+    },
+    {
+      "__typename": "RateMotion"
+    }
   ]
 }

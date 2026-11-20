@@ -657,9 +657,18 @@ class MotionsModule(_BaseModule):
         """
         if type(favorite) is not bool:
             raise ValueError("Favorite state must be True or False")
-        await self._client._graphql(
-            q.FAVORITE_MOTION, {"motion_id": motion_id, "favorite": favorite}
+        result: object = await self._client._graphql(
+            q.FAVORITE_MOTION,
+            {"motion_id": motion_id, "favorite": favorite},
+            path="favorite_motion",
         )
+        if not isinstance(result, dict) or result.get("__typename") != "FavoriteMotion":
+            raise UthanaError(
+                502,
+                "Changing the favorite returned no confirmation. "
+                "Check your favorites before trying again.",
+                kind="uncertain",
+            )
 
     def favorite_sync(self, motion_id: str, favorite: bool = True) -> None:
         """Add a favorite (sync); passing False removes it for compatibility."""
