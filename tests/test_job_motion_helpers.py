@@ -147,7 +147,7 @@ async def test_rating_validation_prevents_submission(score: object) -> None:
     client = make_client()
     client._graphql = AsyncMock()
     try:
-        with pytest.raises(ValueError, match="score must be 0 or 1"):
+        with pytest.raises(ValueError, match="score must be 'like', 'dislike', or None"):
             await client.motions.rate("m1", score)
         client._graphql.assert_not_called()
     finally:
