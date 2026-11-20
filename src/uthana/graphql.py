@@ -140,6 +140,23 @@ mutation CreateTextToMotionJob(
 }
 """
 
+    RATE_MOTION = """
+mutation RateMotion($motion_id: String!, $label_id: String, $score: Int!) {
+    rate_motion(motion_id: $motion_id, label_id: $label_id, score: $score) {
+        motion_rating { motion_id label_id score }
+    }
+}
+"""
+
+    GET_MOTION_DOWNLOADS = """
+query MotionDownloads {
+    motion_downloads {
+        motion_id character_id secs created
+        motion { id name org_id created updated }
+    }
+}
+"""
+
     GET_JOB = """
 query GetJob($job_id: String!) {
     job(job_id: $job_id) {

@@ -22,6 +22,7 @@ from ..stitch import (
 from ..types import (
     DEFAULT_OUTPUT_FORMAT,
     Motion,
+    MotionDownloadRecord,
     OutputFormat,
     RobotFormat,
     TextToMotionResult,
@@ -529,6 +530,39 @@ class MotionsModule(_BaseModule):
             path="update_motion.motion",
             return_type=Motion,
         )
+
+    async def list_downloads(self) -> List[MotionDownloadRecord]:
+        """List the authenticated user's motion download history. This is a free read.
+
+        These records track download seconds, not generation costs. Use the PAYG
+        ledger for actual charges; this API does not support pagination or filters.
+        """
+        return await self._client._graphql(
+            q.GET_MOTION_DOWNLOADS,
+            path="motion_downloads",
+            path_default=[],
+            return_type=list[MotionDownloadRecord],
+        )
+
+    def list_downloads_sync(self) -> List[MotionDownloadRecord]:
+        """List motion download history (sync)."""
+        return asyncio.run(self.list_downloads())
+
+    async def rate(
+        self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
+    ) -> None:
+        """Rate a motion: 1 for thumbs up, 0 for thumbs down."""
+        if type(score) is not int or score not in (0, 1):
+            raise ValueError("Motion rating score must be 0 or 1")
+        await self._client._graphql(
+            q.RATE_MOTION, {"motion_id": motion_id, "score": score, "label_id": label_id}
+        )
+
+    def rate_sync(
+        self, motion_id: str, score: Literal[0, 1], *, label_id: str | None = None
+    ) -> None:
+        """Rate a motion (sync)."""
+        return asyncio.run(self.rate(motion_id, score, label_id=label_id))
 
     async def favorite(self, motion_id: str, favorite: bool) -> None:
         """Set or unset a motion as favorite."""
