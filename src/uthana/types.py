@@ -126,7 +126,6 @@ MotionRatingValue = Literal["like", "dislike"] | None
 class MotionRating(TypedDict):
     """The authenticated user's whole-motion rating and timestamps.
 
-    ``score`` is 1 for like/thumbs up or 0 for dislike/thumbs down; 2 is invalid.
     ``Motion.rating`` is None when the user has not rated the motion.
     """
 
