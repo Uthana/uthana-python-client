@@ -12,11 +12,13 @@ Intervals and deadlines are positive finite seconds. The interval defaults to fi
 ## Rating
 
 ```python
-await client.motions.rate(motion_id, 1)  # thumbs up; use 0 for thumbs down
+await client.motions.rate(motion_id, "like")
+await client.motions.rate(motion_id, "dislike")
+await client.motions.rate(motion_id, None)  # clear your whole-motion vote
 client.motions.rate_sync(motion_id, 0)
 ```
 
-A score of 1 means like/thumbs up; 0 means dislike/thumbs down. Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. This saves the authenticated user's rating for the entire motion. Rating returns no value and does not generate motion. A score of 2 is invalid. Clearing a rating with None is not supported by the current API; an absent rating is distinct from a dislike.
+Use "like" or 1 for thumbs up, "dislike" or 0 for thumbs down, and None to clear your whole-motion vote. Other values, including 2, booleans and numeric strings, are rejected before submission. Clearing requires the API's `clear_motion_rating` mutation. Older servers reject clearing rather than substituting a dislike; no automatic fallback or retry occurs. Rating changes no motion data and never submits generation.
 
 ### Advanced annotation workflows
 

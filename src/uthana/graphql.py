@@ -175,6 +175,12 @@ mutation RateMotion($motion_id: String!, $label_id: String, $score: Int!) {
 }
 """
 
+    CLEAR_MOTION_RATING = """
+mutation ClearMotionRating($motion_id: String!) {
+    clear_motion_rating(motion_id: $motion_id) { ok }
+}
+"""
+
     GET_MOTION_DOWNLOADS = """
 query MotionDownloads {
     motion_downloads {
