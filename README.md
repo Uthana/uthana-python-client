@@ -32,6 +32,9 @@ integrations share one implementation.
 - `motions.download_robot(character_id, motion_id, robot="unitree_g1", fps=30)` returns the motion as Unitree G1 CSV joint trajectories. The character ID selects access and download billing only; the output is always for the robot. The GPU retarget can take minutes, so the default read timeout is 660 seconds.
 - `motions.preview(..., format="apng")` returns the existing APNG preview.
   `motions.download_allowed(...)` checks eligibility without creating a download.
+- `motions.share(character_id, motion_id)` creates a **public** viewer link for people
+  outside the organization. The owner already sees the motion at
+  `https://uthana.com/app/play/<character_id>/<motion_id>` while logged in.
 - `characters.metadata(id)` exposes rig metadata. Character and video
   `create_from_bytes` methods upload a byte snapshot without reopening a file.
   Character results retain the backend compatibility `message`, which should be
@@ -460,7 +463,7 @@ retains its published price.
 
 [Docs: Asset management](https://uthana.com/docs/api/capabilities/asset-management) · [Retargeting](https://uthana.com/docs/api/capabilities/retargeting)
 
-List, download, preview, delete, rename, favorite, and bake motions.
+List, download, preview, share, delete, rename, favorite, and bake motions.
 
 ```python
 import asyncio
@@ -492,6 +495,15 @@ async def manage_motions():
     preview_bytes = await uthana_client.motions.preview(character_id, motion_id)
     with open("preview.webm", "wb") as f:
         f.write(preview_bytes)
+
+    # Share a motion with someone outside your organization. The link opens the 3D
+    # viewer without an account and stays public, so only share what may be public.
+    link = await uthana_client.motions.share(character_id, motion_id)
+    print(link["preview_url"])  # https://uthana.com/app/preview/<character_id>/<motion_id>
+
+    # Narrow the shared playback window with fractions of the motion's duration
+    clip = await uthana_client.motions.share(character_id, motion_id, start=0.25, end=0.75)
+    print(clip["preview_url"])  # ...?start=0.25&end=0.75
 
     # Rename a motion
     await uthana_client.motions.rename("motion-id", "New name")
