@@ -420,19 +420,11 @@ mutation UpdateMotion($motion_id: String!, $name: String, $deleted: Boolean) {
 }
 """
 
-    CREATE_MOTION_FAVORITE = """
-mutation create_motion_favorite($motion_id: String!) {
-    create_motion_favorite(motion_id: $motion_id) {
-        id
-        motion_id
-    }
-}
-"""
-
-    DELETE_MOTION_FAVORITE = """
-mutation delete_motion_favorite($motion_id: String!) {
-    delete_motion_favorite(motion_id: $motion_id) {
-        id
+    # Unfavoriting can leave no record to return, so request only the payload type.
+    FAVORITE_MOTION = """
+mutation FavoriteMotion($motion_id: String!, $favorite: Boolean!) {
+    favorite_motion(motion_id: $motion_id, favorite: $favorite) {
+        __typename
     }
 }
 """

@@ -15,3 +15,5 @@ print(motion.get("favorite"), motion.get("rating"))
 Tags can be a dictionary, a string array or null; inspect the type before using dictionary methods. Missing dates remain unknown. Favorite and rating records include creation/update times when present. A known zero rating means thumbs down. Asset metadata describes identity/timing, not visual quality, and reading it does not regenerate or modify the motion.
 
 These fields describe your own feedback for the entire motion. They are not organization-wide summaries. No user selector is accepted, and these records omit internal user and annotation IDs. A null rating means you have not rated this motion; a null favorite means it is not in your favorites.
+
+To set a favorite, call `await client.motions.favorite(motion_id, True)`; to remove it, pass `False`. This is an explicit state, not a toggle: passing True twice keeps it favorited. Reading the favorite metadata does not change it.

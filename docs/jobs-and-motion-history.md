@@ -16,7 +16,7 @@ await client.motions.rate(motion_id, 1)  # thumbs up; use 0 for thumbs down
 client.motions.rate_sync(motion_id, 0)
 ```
 
-Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. This saves the authenticated user's rating for the entire motion. Rating returns no value and does not generate motion.
+A score of 1 means like/thumbs up; 0 means dislike/thumbs down. Only integer 0 and 1 are accepted; booleans, numeric strings and other scores are rejected before submission. This saves the authenticated user's rating for the entire motion. Rating returns no value and does not generate motion. A score of 2 is invalid. Clearing a rating with None is not supported by the current API; an absent rating is distinct from a dislike.
 
 ### Advanced annotation workflows
 
