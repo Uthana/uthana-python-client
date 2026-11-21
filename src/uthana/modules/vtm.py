@@ -29,8 +29,8 @@ class VtmModule(_BaseModule):
     ) -> VideoToMotionResult:
         """Extract motion capture data from a video; poll the returned job with jobs.get().
 
-        Model defaults to models.toml when omitted. Streams the source with an
-        input-size limit of 200 MiB; ``max_bytes`` can set a lower limit.
+        Model defaults to models.toml when omitted. Reads a bounded snapshot up to
+        200 MiB before submission; ``max_bytes`` can set a lower limit.
         The API limits organizations without an active card to 50 MiB, except contracts.
         """
         _validate_upload_limit(max_bytes)
@@ -41,15 +41,12 @@ class VtmModule(_BaseModule):
         with open(file_path, "rb") as source:
             if os.fstat(source.fileno()).st_size > VIDEO_UPLOAD_MAX_BYTES:
                 raise ValueError("Video upload exceeds 200 MiB. Upload a smaller video.")
-            if max_bytes is None:
-                return await self._client._graphql(
-                    q.CREATE_VIDEO_TO_MOTION,
-                    variables,
-                    upload=(filename, source),
-                    path="create_video_to_motion.job",
-                    return_type=VideoToMotionResult,
-                )
-            content = source.read(min(max_bytes, VIDEO_UPLOAD_MAX_BYTES) + 1)
+            limit = (
+                VIDEO_UPLOAD_MAX_BYTES
+                if max_bytes is None
+                else min(max_bytes, VIDEO_UPLOAD_MAX_BYTES)
+            )
+            content = source.read(limit + 1)
         return await self.create_from_bytes(
             filename,
             content,

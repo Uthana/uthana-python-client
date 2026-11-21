@@ -1,4 +1,6 @@
+from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -37,3 +39,28 @@ async def test_video_boundary_and_lower_custom_limit(monkeypatch: pytest.MonkeyP
             await client.vtm.create_from_bytes("clip.mp4", b"1234", max_bytes=3)
         assert submit.call_count == 1
     client.close()
+
+
+@pytest.mark.asyncio
+async def test_video_reads_are_bounded_even_when_file_size_is_underreported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Source(BytesIO):
+        def fileno(self) -> int:
+            return 0
+
+        def read(self, size: int = -1) -> bytes:
+            assert size == 5
+            return super().read(size)
+
+    monkeypatch.setattr(vtm, "VIDEO_UPLOAD_MAX_BYTES", 4)
+    monkeypatch.setattr(vtm.os, "fstat", lambda _: SimpleNamespace(st_size=0))
+    with patch("builtins.open", return_value=Source(b"123456789")):
+        client = Uthana("synthetic-key", telemetry=False)
+        try:
+            with patch.object(client, "_graphql", new_callable=AsyncMock) as submit:
+                with pytest.raises(ValueError, match="200 MiB"):
+                    await client.vtm.create("clip.mp4")
+                submit.assert_not_called()
+        finally:
+            client.close()
