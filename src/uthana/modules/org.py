@@ -138,8 +138,10 @@ class OrgModule(_BaseModule):
         is inclusive and ``until`` exclusive; naive datetimes are UTC. ``types``
         keeps only those entry types (``debit``, ``topup``, ``credit_grant``,
         ``adjustment``). Omitted/null bounds default to seven days ago and now.
-        Explicit bounds must be within that window, with since earlier than until.
-        Every page retains the date bounds. Use the API or web for older history.
+        Earlier starts are clamped to the current seven-day cutoff. Future bounds,
+        expired upper bounds and empty/reversed effective ranges raise ValueError.
+        Retain until when paging; entries can age out as the lower bound advances.
+        This is not a fixed snapshot. Use the API or web for older history.
         """
         query, variables = _ledger_query(
             limit=limit, before_id=before_id, since=since, until=until, types=types
