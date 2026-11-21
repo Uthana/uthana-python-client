@@ -68,6 +68,8 @@ def _ledger_query(
             )
             if timestamp.tzinfo is None:
                 timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+            if name == "since":
+                timestamp = max(timestamp, cutoff)
             if timestamp < cutoff or timestamp > now:
                 raise ValueError(
                     f"{name} must be within the last 7 days. Use the API or web for older history."
