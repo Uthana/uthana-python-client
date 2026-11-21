@@ -11,15 +11,17 @@ from uthana import Uthana
 
 
 @pytest.fixture(autouse=True)
-def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> list[datetime.datetime]:
     original = datetime.datetime
+    clock = [original(2026, 11, 20, tzinfo=datetime.timezone.utc)]
 
     class FixedDatetime(original):
         @classmethod
         def now(cls, tz: datetime.tzinfo | None = None) -> datetime.datetime:
-            return cls(2026, 11, 20, tzinfo=datetime.timezone.utc).astimezone(tz)
+            return clock[0].astimezone(tz)
 
     monkeypatch.setattr("uthana.modules.org.datetime.datetime", FixedDatetime)
+    return clock
 
 
 def client_for(handler: Any) -> Uthana:
@@ -134,7 +136,6 @@ async def test_debit_asset_and_job_ids_pass_through_unchanged() -> None:
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"since": "2026-11-12T23:59:59.999Z"},
         {"until": "2026-11-12T23:59:59.999Z"},
         {"until": "2026-11-20T00:00:00.001Z"},
         {"since": "2026-11-20T00:00:00.001Z"},
@@ -177,4 +178,49 @@ def test_exact_cutoff_and_timezone_offsets_are_accepted() -> None:
     client = client_for(handler)
     client.org.get_ledger_sync(since="2026-11-12T16:00:00-08:00")
     assert captured[0]["variables"]["since"] == "2026-11-12T16:00:00-08:00"
+    client.close()
+
+
+@pytest.mark.parametrize("before_id", [None, "entry1"])
+@pytest.mark.parametrize(
+    "elapsed",
+    [
+        datetime.timedelta(microseconds=1),
+        datetime.timedelta(seconds=3),
+        datetime.timedelta(minutes=10),
+    ],
+)
+def test_computed_bounds_survive_clock_advance(
+    fixed_clock: list[datetime.datetime], before_id: str | None, elapsed: datetime.timedelta
+) -> None:
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"payg_ledger": []}})
+
+    client = client_for(handler)
+    client.org.get_ledger_sync()
+    first = captured[0]["variables"]
+    fixed_clock[0] += elapsed
+    client.org.get_ledger_sync(since=first["since"], until=first["until"], before_id=before_id)
+    second = captured[1]["variables"]
+    assert second["since"] == (fixed_clock[0] - datetime.timedelta(days=7)).isoformat()
+    assert second["until"] == first["until"]
+    assert second.get("before_id") == before_id
+    assert len(captured) == 2
+    client.close()
+
+
+@pytest.mark.parametrize("before_id", [None, "old-entry"])
+def test_old_start_is_clamped_without_expanding_history(before_id: str | None) -> None:
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"payg_ledger": []}})
+
+    client = client_for(handler)
+    client.org.get_ledger_sync(since="2000-01-01", before_id=before_id)
+    assert captured[0]["variables"]["since"] == "2026-11-13T00:00:00+00:00"
     client.close()
