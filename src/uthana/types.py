@@ -51,8 +51,19 @@ class User(TypedDict, total=False):
     email_verified: bool | None
 
 
+class UploadLimit(TypedDict):
+    """Server-owned upload policy; a null maximum means unknown or unbounded."""
+
+    category: str
+    max_bytes: int | None
+    extensions: list[str]
+    max_bytes_without_preprocessing: int | None
+
+
 class Org(TypedDict, total=False):
     """Org object from org.get_org."""
+
+    upload_limits: list[UploadLimit] | None
 
     id: str
     name: str | None

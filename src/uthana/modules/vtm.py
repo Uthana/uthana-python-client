@@ -5,12 +5,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from ..graphql import q
 from ..models import models
 from ..types import VideoToMotionResult, VtmModelType
 from ..utils import _validate_upload_limit, normalize_model_name, prepare_video_to_motion
 from ._base import _BaseModule
+
+VIDEO_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
 
 
 class VtmModule(_BaseModule):
@@ -26,8 +29,9 @@ class VtmModule(_BaseModule):
     ) -> VideoToMotionResult:
         """Extract motion capture data from a video; poll the returned job with jobs.get().
 
-        Model defaults to models.toml when omitted. Streams the source without an
-        input-size limit by default; an explicit ``max_bytes`` reads a bounded snapshot.
+        Model defaults to models.toml when omitted. Streams the source with an
+        input-size limit of 200 MiB; ``max_bytes`` can set a lower limit.
+        The API limits organizations without an active card to 50 MiB, except contracts.
         """
         _validate_upload_limit(max_bytes)
         variables, filename = prepare_video_to_motion(file_path, motion_name)
@@ -35,6 +39,8 @@ class VtmModule(_BaseModule):
             model if model is not None else models.vtm.default
         )
         with open(file_path, "rb") as source:
+            if os.fstat(source.fileno()).st_size > VIDEO_UPLOAD_MAX_BYTES:
+                raise ValueError("Video upload exceeds 200 MiB. Upload a smaller video.")
             if max_bytes is None:
                 return await self._client._graphql(
                     q.CREATE_VIDEO_TO_MOTION,
@@ -43,7 +49,7 @@ class VtmModule(_BaseModule):
                     path="create_video_to_motion.job",
                     return_type=VideoToMotionResult,
                 )
-            content = source.read(max_bytes + 1)
+            content = source.read(min(max_bytes, VIDEO_UPLOAD_MAX_BYTES) + 1)
         return await self.create_from_bytes(
             filename,
             content,
@@ -72,16 +78,20 @@ class VtmModule(_BaseModule):
         *,
         motion_name: str | None = None,
         model: VtmModelType | None = None,
-        max_bytes: int | None = 128 * 1024 * 1024,
+        max_bytes: int | None = VIDEO_UPLOAD_MAX_BYTES,
     ) -> VideoToMotionResult:
         """Submit a video byte snapshot without reopening a local file.
 
         ``filename`` determines supported video format and default motion name.
-        An explicitly supplied motion name is preserved exactly.
+        An explicitly supplied motion name is preserved exactly. Videos cannot exceed
+        200 MiB, even with ``max_bytes=None``. The API applies a 50 MiB limit to
+        organizations without an active card, except contract organizations.
         """
         _validate_upload_limit(max_bytes)
         if not isinstance(content, bytes) or not content:
             raise ValueError("Video upload content must be nonempty bytes")
+        if len(content) > VIDEO_UPLOAD_MAX_BYTES:
+            raise ValueError("Video upload exceeds 200 MiB. Upload a smaller video.")
         if max_bytes is not None and len(content) > max_bytes:
             raise ValueError("Video upload exceeds max_bytes")
         variables, filename = prepare_video_to_motion(filename, motion_name)
@@ -103,7 +113,7 @@ class VtmModule(_BaseModule):
         *,
         motion_name: str | None = None,
         model: VtmModelType | None = None,
-        max_bytes: int | None = 128 * 1024 * 1024,
+        max_bytes: int | None = VIDEO_UPLOAD_MAX_BYTES,
     ) -> VideoToMotionResult:
         """Submit a video byte snapshot (sync)."""
         return asyncio.run(

@@ -840,7 +840,7 @@ class MotionsModule(_BaseModule):
         - **move_speed**: speed in m/s (0.25–8.0; default 1.2; recommended up to 6.0).
         - **style_id**: from :meth:`list_locomotion_styles` (default ``neutral_male_a``).
         - **travel_angle**: direction in degrees on the ground plane, -180 to 180
-          (0 forward, 90 right; default 0.0).
+          (0 forward, 90 to the character’s left, -90 to its right; default 0.0).
 
         Returns ``character_id`` and ``motion_id`` like text-to-motion.
         """

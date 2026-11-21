@@ -251,6 +251,7 @@ query {
     GET_ORG = """
 query {
     org {
+        upload_limits
         id
         name
         motion_download_secs_per_month
