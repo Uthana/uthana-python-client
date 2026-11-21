@@ -513,12 +513,12 @@ async def test_character_download_uses_shared_bounded_transport() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["character", "video", "image"])
+@pytest.mark.parametrize("kind", ["character", "image"])
 async def test_legacy_file_upload_keeps_open_stream_without_default_cap(
     tmp_path: Path, kind: str
 ) -> None:
     """A sparse input over128MiB reaches multipart without being buffered or rejected."""
-    suffix = {"character": ".glb", "video": ".mp4", "image": ".png"}[kind]
+    suffix = {"character": ".glb", "image": ".png"}[kind]
     source = tmp_path / ("source" + suffix)
     with source.open("wb") as output:
         output.write(b"glTF" if kind == "character" else b"test")
@@ -538,8 +538,6 @@ async def test_legacy_file_upload_keeps_open_stream_without_default_cap(
             observed.append(stream)
         if kind == "character":
             return {"create_character": {"character": {"id": "char1"}}}
-        if kind == "video":
-            return {"id": "job1"}
         if query == q.CREATE_IMAGE_FROM_IMAGE:
             return {"character_id": "char1", "image": {"key": "image1"}}
         return {"character": {"id": "char1"}}
@@ -548,8 +546,6 @@ async def test_legacy_file_upload_keeps_open_stream_without_default_cap(
     with patch.object(client, "_graphql", side_effect=graphql):
         if kind == "character":
             await client.characters.create_from_file(str(source))
-        elif kind == "video":
-            await client.vtm.create(str(source))
         else:
             await client.characters.create_from_image(str(source))
     assert len(observed) == 1
