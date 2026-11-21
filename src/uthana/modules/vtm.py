@@ -31,7 +31,7 @@ class VtmModule(_BaseModule):
 
         Model defaults to models.toml when omitted. Reads a bounded snapshot up to
         200 MiB before submission; ``max_bytes`` can set a lower limit.
-        The API limits organizations without an active card to 50 MiB, except contracts.
+        The API limits organizations without an active payment method or agreement to 50 MiB.
         """
         _validate_upload_limit(max_bytes)
         variables, filename = prepare_video_to_motion(file_path, motion_name)
@@ -82,7 +82,7 @@ class VtmModule(_BaseModule):
         ``filename`` determines supported video format and default motion name.
         An explicitly supplied motion name is preserved exactly. Videos cannot exceed
         200 MiB, even with ``max_bytes=None``. The API applies a 50 MiB limit to
-        organizations without an active card, except contract organizations.
+        organizations without an active payment method or agreement.
         """
         _validate_upload_limit(max_bytes)
         if not isinstance(content, bytes) or not content:

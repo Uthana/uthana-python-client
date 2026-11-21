@@ -75,7 +75,7 @@ using any known ID, reconcile with the host's saved request record, or ask suppo
 if no receipt is available. A query/media overflow remains `kind="response_too_large"`.
 Connection exceptions remain HTTPX exception types.
 
-Video uploads have a hard 200 MiB maximum, including byte snapshots and calls with `max_bytes=None`. A smaller `max_bytes` still applies. The API limits organizations without an active card to 50 MiB; contract organizations are exempt from that lower limit.
+Video uploads have a hard 200 MiB maximum, including byte snapshots and calls with `max_bytes=None`. A smaller `max_bytes` still applies. The API limits organizations without an active payment method or agreement to 50 MiB.
 
 Video-to-motion uploads accept MP4, MOV, and AVI. WebM input is not supported by
 the backend; WebM **preview downloads** remain available.
