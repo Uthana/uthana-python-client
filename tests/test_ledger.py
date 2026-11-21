@@ -10,6 +10,18 @@ import pytest
 from uthana import Uthana
 
 
+@pytest.fixture(autouse=True)
+def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = datetime.datetime
+
+    class FixedDatetime(original):
+        @classmethod
+        def now(cls, tz: datetime.tzinfo | None = None) -> datetime.datetime:
+            return cls(2026, 11, 20, tzinfo=datetime.timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr("uthana.modules.org.datetime.datetime", FixedDatetime)
+
+
 def client_for(handler: Any) -> Uthana:
     return Uthana(
         "synthetic-key",
@@ -33,7 +45,7 @@ ROW = {
 
 
 @pytest.mark.asyncio
-async def test_default_call_sends_only_limit() -> None:
+async def test_default_call_sends_seven_day_bounds() -> None:
     captured = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -43,9 +55,13 @@ async def test_default_call_sends_only_limit() -> None:
     client = client_for(handler)
     assert await client.org.get_ledger() == [ROW]
     payload = captured[0]
-    assert payload["query"].lstrip().startswith("query Ledger($limit: Int)")
+    assert "$since: DateTime" in payload["query"]
     assert "before_id" not in payload["query"]
-    assert payload["variables"] == {"limit": 50}
+    assert payload["variables"] == {
+        "limit": 50,
+        "since": "2026-11-13T00:00:00+00:00",
+        "until": "2026-11-20T00:00:00+00:00",
+    }
     client.close()
 
 
@@ -61,16 +77,16 @@ async def test_filters_are_sent_and_naive_times_are_utc() -> None:
     rows = await client.org.get_ledger(
         limit=500,
         before_id="pl9",
-        since=datetime.datetime(2026, 11, 1),
-        until="2026-11-04T00:00:00Z",
+        since=datetime.datetime(2026, 11, 18),
+        until="2026-11-19T00:00:00+00:00",
         types=("debit", "topup"),
     )
     assert rows == []
     assert captured[0]["variables"] == {
         "limit": 500,
         "before_id": "pl9",
-        "since": "2026-11-01T00:00:00+00:00",
-        "until": "2026-11-04T00:00:00Z",
+        "since": "2026-11-18T00:00:00+00:00",
+        "until": "2026-11-19T00:00:00+00:00",
         "types": ["debit", "topup"],
     }
     query = captured[0]["query"]
@@ -112,4 +128,53 @@ async def test_debit_asset_and_job_ids_pass_through_unchanged() -> None:
     [row] = await client.org.get_ledger(limit=1)
     assert row["job_id"] == "mMotion123" and row["task_id"] == "J0000000001"
     assert "job_id" in captured[0]["query"] and "task_id" in captured[0]["query"]
+    client.close()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"since": "2026-11-12T23:59:59.999Z"},
+        {"until": "2026-11-12T23:59:59.999Z"},
+        {"until": "2026-11-20T00:00:00.001Z"},
+        {"since": "2026-11-20T00:00:00.001Z"},
+        {"since": "2026-11-19T00:00:00Z", "until": "2026-11-19T00:00:00Z"},
+        {"since": "2026-11-19T00:00:00Z", "until": "2026-11-18T00:00:00Z"},
+    ],
+)
+def test_rejects_dates_outside_window_and_reversed_bounds(kwargs: Any) -> None:
+    client = client_for(lambda _: pytest.fail("Unexpected HTTP request"))
+    with pytest.raises(ValueError):
+        client.org.get_ledger_sync(**kwargs)
+    client.close()
+
+
+def test_paging_cannot_escape_recent_window() -> None:
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"payg_ledger": []}})
+
+    client = client_for(handler)
+    assert client.org.get_ledger_sync(before_id="old-entry", since=None, until=None) == []
+    assert captured[0]["variables"] == {
+        "limit": 50,
+        "before_id": "old-entry",
+        "since": "2026-11-13T00:00:00+00:00",
+        "until": "2026-11-20T00:00:00+00:00",
+    }
+    client.close()
+
+
+def test_exact_cutoff_and_timezone_offsets_are_accepted() -> None:
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json={"data": {"payg_ledger": []}})
+
+    client = client_for(handler)
+    client.org.get_ledger_sync(since="2026-11-12T16:00:00-08:00")
+    assert captured[0]["variables"]["since"] == "2026-11-12T16:00:00-08:00"
     client.close()

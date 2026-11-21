@@ -12,6 +12,8 @@ from ..graphql import q
 from ..types import LedgerEntry, Org, User
 from ._base import _BaseModule
 
+LEDGER_HISTORY_DAYS = 7
+
 LEDGER_MAX_LIMIT = 500
 """Largest page the backend returns for one ledger request."""
 
@@ -41,7 +43,7 @@ def _ledger_query(
     until: datetime.datetime | str | None,
     types: Sequence[str] | None,
 ) -> tuple[str, dict]:
-    """Build the ledger query, sending only the filters the caller set."""
+    """Build a ledger query restricted to the last seven days."""
     is_valid_limit = (
         isinstance(limit, int) and not isinstance(limit, bool) and 1 <= limit <= LEDGER_MAX_LIMIT
     )
@@ -56,11 +58,27 @@ def _ledger_query(
         declared.append("$before_id: ID")
         arguments.append("before_id: $before_id")
         variables["before_id"] = before_id
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(days=LEDGER_HISTORY_DAYS)
+    times = {"since": cutoff, "until": now}
     for name, value in (("since", since), ("until", until)):
         if value is not None:
-            declared.append(f"${name}: DateTime")
-            arguments.append(f"{name}: ${name}")
-            variables[name] = _ledger_time(name, value)
+            timestamp = datetime.datetime.fromisoformat(
+                _ledger_time(name, value).replace("Z", "+00:00")
+            )
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+            if timestamp < cutoff or timestamp > now:
+                raise ValueError(
+                    f"{name} must be within the last 7 days. Use the API or web for older history."
+                )
+            times[name] = timestamp
+    if times["since"] >= times["until"]:
+        raise ValueError("since must be earlier than until.")
+    for name, timestamp in times.items():
+        declared.append(f"${name}: DateTime")
+        arguments.append(f"{name}: ${name}")
+        variables[name] = timestamp.isoformat()
     if types is not None:
         if isinstance(types, str) or not all(isinstance(t, str) and t for t in types):
             raise ValueError("types must be a list of entry type names, such as ['debit'].")
@@ -112,13 +130,14 @@ class OrgModule(_BaseModule):
         until: datetime.datetime | str | None = None,
         types: Sequence[str] | None = None,
     ) -> list[LedgerEntry]:
-        """Get the org's PAYG ledger (charges, payments, credits), newest first.
+        """Get the org's PAYG ledger from the last seven days, newest first.
 
         Page backwards by passing the last entry's ``id`` as ``before_id``. ``since``
         is inclusive and ``until`` exclusive; naive datetimes are UTC. ``types``
         keeps only those entry types (``debit``, ``topup``, ``credit_grant``,
-        ``adjustment``). ``before_id``, ``since``, ``until`` and ``types`` need a
-        backend that supports ledger filters; ``limit`` alone works everywhere.
+        ``adjustment``). Omitted/null bounds default to seven days ago and now.
+        Explicit bounds must be within that window, with since earlier than until.
+        Every page retains the date bounds. Use the API or web for older history.
         """
         query, variables = _ledger_query(
             limit=limit, before_id=before_id, since=since, until=until, types=types
