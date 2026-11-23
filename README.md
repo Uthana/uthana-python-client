@@ -57,9 +57,9 @@ async HTTP transports for testing. `max_response_bytes` bounds decoded GraphQL
 hide a successful upload or generation receipt. To opt into a separate mutation
 limit, set `max_mutation_response_bytes`. Media and character-metadata methods
 accept their own `max_bytes`.
-Character/video byte-snapshot uploads are bounded at 128 MiB by default;
+Character byte-snapshot uploads are bounded at 128 MiB by default;
 reference-image preparation is bounded at 16 MiB. Existing file-upload
-entry points retain streaming without an input-size limit and the configured client
+entry points for characters retain streaming without an input-size limit and the configured client
 timeout; pass `max_bytes` to opt into a bounded snapshot. Bounded character file
 uploads use the same 360-second phase timeout (15 seconds to connect) as byte
 uploads unless `timeout` is explicitly supplied. Call `close()`
@@ -74,6 +74,8 @@ receipt could not be read. Do not automatically resubmit: inspect the job or ass
 using any known ID, reconcile with the host's saved request record, or ask support
 if no receipt is available. A query/media overflow remains `kind="response_too_large"`.
 Connection exceptions remain HTTPX exception types.
+
+Video uploads have a hard 200 MiB maximum, including byte snapshots and calls with `max_bytes=None`. A smaller `max_bytes` still applies. The API limits organizations without an active payment method or agreement to 50 MiB.
 
 Video-to-motion uploads accept MP4, MOV, and AVI. WebM input is not supported by
 the backend; WebM **preview downloads** remain available.
